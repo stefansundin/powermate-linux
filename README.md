@@ -1,6 +1,6 @@
 # PowerMate Linux Driver
 
-This is a small Linux input driver for the Griffin PowerMate. Tested only on Ubuntu 14.10.
+This is a small Linux input driver for the [Griffin PowerMate](https://store.griffintechnology.com/desktop/powermate). Tested only on Ubuntu 14.10.
 
 
 # Disclaimer
