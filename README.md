@@ -7,6 +7,8 @@ This is a small Linux input driver for the [Griffin PowerMate](https://store.gri
 
 PowerMate is a registered trademark of Griffin Technologies Inc. This software is not affiliated or endorsed by them.
 
+This software is written by Stefan Sundin and is licensed under GPLv3.
+
 
 # Installation
 
@@ -31,3 +33,10 @@ Make it run automatically on login somehow. The script should handle the device 
 # RSS
 
 [![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
+
+
+# TODO
+
+- [ ] Change LED brightness depending on volume.
+- [ ] Run program from udev rule (causes amixer connect error now).
+- [ ] Create deb and ppa.
