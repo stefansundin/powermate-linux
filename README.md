@@ -18,6 +18,16 @@ ACTION=="add", ENV{ID_USB_DRIVER}=="powermate", SYMLINK+="input/powermate", MODE
 
 After creating the file, unplug and plug the PowerMate back in.
 
-Compile the executable with `make` and run it with `./powermate`.
+Compile the executable with `make`, or download [here](https://github.com/stefansundin/powermate-linux/releases/latest).
+
+
+# Run
+
+Simply run the executable by running `./powermate`.
 
 Make it run automatically on login somehow. The script should handle the device being disconnected and connected without problems.
+
+
+# RSS
+
+[![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
