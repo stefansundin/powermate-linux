@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
   }
   pa_threaded_mainloop_unlock(mainloop);
 
+  // The infinity loop
   while (1) {
     while (fd == -1) {
       fd = open(dev, O_RDONLY);
@@ -136,6 +137,15 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Could not open %s: %s\n", dev, strerror(errno));
         fprintf(stderr, "Sleeping 1 second.\n");
         sleep(1);
+      }
+      else {
+        // If we get here, the device was probably disconnected and then connected
+        // The kernel driver will automatically set the LED 50% brightness when plugged in
+        // So at this point we have to set the brightness to what the volume currently is
+        pa_threaded_mainloop_lock(mainloop);
+        pa_operation *o = pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL);
+        pa_operation_unref(o);
+        pa_threaded_mainloop_unlock(mainloop);
       }
     }
 
