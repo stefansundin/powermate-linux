@@ -34,6 +34,11 @@ Make it run automatically on login somehow. The program can handle the device be
 
 [![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
 
+**v3** - unreleased - [diff](https://github.com/stefansundin/powermate-linux/compare/v2...v3):
+- Movie mode -- hold knob down for one second to turn off LED.
+- Device no longer has to be connected when program starts.
+- Program is now single-threaded.
+
 **v2** - 2015-04-11 - [diff](https://github.com/stefansundin/powermate-linux/compare/v1...v2):
 - The LED is now updated when the volume changes.
 - The program now uses PulseAudio directly. If this is an issue for you, use [v1](https://github.com/stefansundin/powermate-linux/releases/tag/v1).
@@ -45,4 +50,5 @@ Make it run automatically on login somehow. The program can handle the device be
 # TODO
 
 - [ ] Run program from udev rule (causes pulseaudio connect error now).
+- [ ] Reconnect if pulseaudio connection is lost.
 - [ ] Create deb and ppa.

@@ -1,6 +1,6 @@
 # sudo apt-get install libpulse-dev
 
-CFLAGS = -lpulse -O2 -s
+CFLAGS = -lpulse -O2 -s -Wall
 
 powermate: main.c
 	gcc -o powermate main.c $(CFLAGS)
