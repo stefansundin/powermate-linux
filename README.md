@@ -50,5 +50,4 @@ Make it run automatically on login somehow. The program can handle the device be
 # TODO
 
 - [ ] Run program from udev rule (causes pulseaudio connect error now).
-- [ ] Reconnect if pulseaudio connection is lost.
 - [ ] Create deb and ppa.

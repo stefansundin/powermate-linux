@@ -12,7 +12,7 @@
 
 char dev[] = "/dev/input/powermate";
 int p = 2;
-int movie_mode_timeout = 1;
+int movie_mode_timeout = 1000; // milliseconds
 
 int devfd = 0;
 short knob_depressed = 0;
@@ -26,36 +26,43 @@ pa_cvolume vol;
 short muted = 0;
 short movie_mode = 0;
 
+void set_led(val) {
+  // printf("set_led(%d)\n", val);
+  struct input_event ev;
+  memset(&ev, 0, sizeof(ev));
+  ev.type = EV_MSC;
+  ev.code = MSC_PULSELED;
+  ev.value = val;
+  if (write(devfd, &ev, sizeof(ev)) != sizeof(ev)) {
+    fprintf(stderr, "write(): %s\n", strerror(errno));
+  }
+}
+
+void update_led() {
+  if (muted || movie_mode) {
+    set_led(0);
+  }
+  else {
+    set_led(vol.values[0] * 255 / PA_VOLUME_NORM);
+  }
+}
 
 void pa_server_info_callback(pa_context *c, const pa_server_info *info, void *userdata) {
   int len = strlen(info->default_sink_name)+1;
   sink_name = malloc(len);
   memcpy(sink_name, info->default_sink_name, len);
-  printf("sink_name: %s\n", sink_name);
+  printf("Sink name: %s\n", sink_name);
 }
 
 void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eol, void* userdata) {
   if (eol) {
     return;
   }
+  printf("New volume: %5d (%6.2f%%), muted: %d\n", info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
 
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
-  printf("new volume: %d (%.2f%%), muted: %d\n", info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
-
-  // update LED
-  struct input_event ev;
-  memset(&ev, 0, sizeof(ev));
-  ev.type = EV_MSC;
-  ev.code = MSC_PULSELED;
-  if (!muted && !movie_mode) {
-    ev.value = vol.values[0] * 255 / PA_VOLUME_NORM;
-  }
-  // printf("set led: %d\n", ev.value);
-  // write
-  if (write(devfd, &ev, sizeof(ev)) != sizeof(ev)) {
-    fprintf(stderr, "write(): %s\n", strerror(errno));
-  }
+  update_led();
 }
 
 void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
@@ -82,15 +89,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     devfd = open(dev, O_RDWR);
     if (devfd == -1) {
       fprintf(stderr, "Could not open %s: %s\n", dev, strerror(errno));
-      fprintf(stderr, "Sleeping 1 second.\n");
       sleep(1);
     }
     else {
-      fprintf(stderr, "Device connected!\n");
-      // If we get here, the device was probably disconnected and then connected
-      // The kernel driver will automatically set the LED 50% brightness when plugged in
-      // So at this point we have to set the brightness to what the volume currently is
-      pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+      printf("Device connected!\n");
+      // When the device is connected, the kernel driver sets the LED to 50% brightness
+      // We have to update the LED to represent the current volume
+      update_led();
     }
   }
 
@@ -105,7 +110,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     if (gettimeofday(&now, NULL) < 0) {
       fprintf(stderr, "gettimeofday failed\n");
     }
-    timeout = ((knob_depressed_timestamp.tv_sec+movie_mode_timeout)*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
+    timeout = (movie_mode_timeout+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
     fprintf(stderr, "timeout=%d\n", timeout);
   }
 
@@ -122,12 +127,11 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 
   if (knob_depressed && ret == 0) {
     // timer ran out
-    // fprintf(stderr, "knob depressed for %d seconds!\n", movie_mode_timeout);
+    // fprintf(stderr, "knob depressed for %d milliseconds!\n", movie_mode_timeout);
     knob_depressed = 0;
     movie_mode = !movie_mode;
-    fprintf(stderr, "movie mode: %d\n", movie_mode);
-    // force LED update
-    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+    printf("Movie mode: %d\n", movie_mode);
+    update_led();
     // if muted, unmute
     if (muted) {
       pa_context_set_sink_mute_by_name(context, sink_name, !muted, NULL, NULL);
@@ -139,7 +143,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     struct input_event ev;
     int n = read(devfd, &ev, sizeof(ev));
     if (n != sizeof(ev)) {
-      fprintf(stderr, "Device disappeared!\n");
+      printf("Device disappeared!\n");
       devfd = -1;
     }
     else {
@@ -147,7 +151,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         pa_volume_t newvol = vol.values[0];
         if (ev.value == -1) {
           // counter clock-wise turn
-          // fprintf(stderr, "counter clock-wise turn!\n");
           newvol = vol.values[0] - PA_VOLUME_NORM*p/100;
           if (newvol > vol.values[0]) {
             // we wrapped around, clamp to 0
@@ -156,7 +159,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         }
         else if (ev.value == 1) {
           // clock-wise turn
-          // fprintf(stderr, "clock-wise turn!\n");
           newvol = MIN(vol.values[0] + PA_VOLUME_NORM*p/100, PA_VOLUME_NORM);
         }
         // set new volume
@@ -166,7 +168,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
           // knob depressed
-          // fprintf(stderr, "knob depressed!\n");
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
           // printf("set mute: %d\n", !muted);
@@ -174,7 +175,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         }
         else if (ev.value == 0) {
           // knob released
-          // fprintf(stderr, "knob released!\n");
           knob_depressed = 0;
         }
       }
@@ -216,54 +216,66 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  // PulseAudio
-  pa_mainloop *mainloop = pa_mainloop_new();
-  pa_context_state_t state;
-
-  // Get a context
-  context = pa_context_new(pa_mainloop_get_api(mainloop), "powermate");
-  if (context == NULL) {
-    fprintf(stderr, "pa_context_new failed\n");
-    return 1;
-  }
-
-  // Connect
-  if (pa_context_connect(context, NULL, PA_CONTEXT_NOFLAGS, NULL) < 0) {
-    fprintf(stderr, "pa_context_connect failed\n");
-    return 1;
-  }
-
-  // Wait for connection to be ready
-  do {
-    if (pa_mainloop_iterate(mainloop, 1, NULL) < 0) {
-      fprintf(stderr, "pa_mainloop_iterate failed\n");
-      return 1;
-    }
-    state = pa_context_get_state(context);
-  } while (state != PA_CONTEXT_READY);
-
-  // We're connected, get sink and volume info
-  pa_operation *o;
-  pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
-  pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
-
-  // Subscribe to new volume events
-  pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
-  o = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK, NULL, NULL);
-  if (o == NULL) {
-    fprintf(stderr, "pa_context_subscribe() failed");
-    return 1;
-  }
-  pa_operation_unref(o);
-
-  // Set up our custom poll function
-  pa_mainloop_set_poll_func(mainloop, poll_func, NULL);
-
   while (1) {
-    if (pa_mainloop_iterate(mainloop, 1, NULL) < 0) {
-      fprintf(stderr, "pa_mainloop_iterate failed\n");
+    // PulseAudio
+    pa_mainloop *mainloop = pa_mainloop_new();
+
+    // Get a context
+    context = pa_context_new(pa_mainloop_get_api(mainloop), "powermate");
+    if (context == NULL) {
+      fprintf(stderr, "pa_context_new failed\n");
       return 1;
     }
+
+    // Connect
+    if (pa_context_connect(context, NULL, PA_CONTEXT_NOFAIL|PA_CONTEXT_NOAUTOSPAWN, NULL) < 0) {
+      fprintf(stderr, "pa_context_connect failed\n");
+      return 1;
+    }
+
+    // Wait for connection to be ready
+    pa_context_state_t state;
+    do {
+      if (pa_mainloop_iterate(mainloop, 1, NULL) < 0) {
+        fprintf(stderr, "pa_mainloop_iterate failed\n");
+        return 1;
+      }
+      state = pa_context_get_state(context);
+    } while (state != PA_CONTEXT_READY);
+
+    // We're connected, get sink and volume info
+    pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
+    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+
+    // Subscribe to new volume events
+    pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
+    pa_operation *o = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK, NULL, NULL);
+    if (o == NULL) {
+      fprintf(stderr, "pa_context_subscribe() failed");
+      return 1;
+    }
+    pa_operation_unref(o);
+
+    // Set up our custom poll function
+    pa_mainloop_set_poll_func(mainloop, poll_func, NULL);
+
+    // pa_context_state_t last_state = state;
+    while (1) {
+      if (pa_mainloop_iterate(mainloop, 1, NULL) < 0) {
+        fprintf(stderr, "pa_mainloop_iterate failed\n");
+        break;
+      }
+      state = pa_context_get_state(context);
+      if (state == PA_CONTEXT_FAILED || state == PA_CONTEXT_TERMINATED) {
+        printf("PulseAudio connection lost!\n");
+        // For some reason spawning pulseaudio after forking does not seem to work well, and if we try to reconnect too soon, it doesn't work. So just chill for 10 seconds.
+        sleep(10);
+        break;
+      }
+    }
+
+    pa_context_disconnect(context);
+    pa_mainloop_free(mainloop);
   }
 
   return 0;
