@@ -193,6 +193,7 @@ int main(int argc, char *argv[]) {
   if (devfd == -1) {
     fprintf(stderr, "Could not open %s: %s\n", dev, strerror(errno));
     fprintf(stderr, "Don't worry, it will be opened automatically if it appears.\n");
+    fprintf(stderr, "If you just installed this program, you might have to unplug the device and then plug it back in..\n");
   }
 
   // Daemonize
