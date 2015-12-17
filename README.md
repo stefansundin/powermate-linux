@@ -36,6 +36,9 @@ Make it run automatically on login somehow. The program can handle the device be
 
 [![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
 
+**v5** - 2015-12-16 - [diff](https://github.com/stefansundin/powermate-linux/compare/v4...v5):
+- Properly detect new sink volume.
+
 **v4** - 2015-12-16 - [diff](https://github.com/stefansundin/powermate-linux/compare/v3...v4):
 - Detect sink change.
 - Handle louder than 100% better.
