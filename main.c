@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
     pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
     pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
 
-    // Subscribe to new volume events
+    // Subscribe to pulseaudio events
     pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
     pa_operation *o = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK|PA_SUBSCRIPTION_MASK_SERVER, NULL, NULL);
     if (o == NULL) {
