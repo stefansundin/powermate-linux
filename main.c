@@ -20,7 +20,7 @@ struct timeval knob_depressed_timestamp;
 
 struct pollfd *pfds = NULL;
 int pa_nfds = 0;
-char *sink_name = NULL;
+int sink_index = -1;
 pa_context *context = NULL;
 pa_cvolume vol;
 short muted = 0;
@@ -48,35 +48,34 @@ void update_led() {
   }
 }
 
-void pa_server_info_callback(pa_context *c, const pa_server_info *info, void *userdata) {
-  int len = strlen(info->default_sink_name)+1;
-  sink_name = malloc(len);
-  memcpy(sink_name, info->default_sink_name, len);
-  printf("Sink name: %s\n", sink_name);
-}
-
 void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eol, void* userdata) {
   if (eol) {
     return;
   }
-  printf("New volume: %5d (%6.2f%%), muted: %d\n", info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
+  sink_index = info->index;
+  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
 
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
   update_led();
 }
 
+void pa_server_info_callback(pa_context *c, const pa_server_info *info, void *userdata) {
+  printf("Sink name: %s\n", info->default_sink_name);
+  // get data about default sink
+  pa_operation_unref(pa_context_get_sink_info_by_name(context, info->default_sink_name, pa_sink_info_callback, NULL));
+}
+
 void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
   pa_subscription_event_type_t type = t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
-  // printf("new event: %04x (type: %04x)\n", t, type);
+  // printf("new event: %04x (type: %04x, index: %d)\n", t, type, index);
   if (type == PA_SUBSCRIPTION_EVENT_SERVER) {
-    // sink might have changed, get new sink name and refresh volume
+    // sink might have changed, refresh server info
     pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
-    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
   }
-  else if (type == PA_SUBSCRIPTION_EVENT_SINK) {
+  else if (type == PA_SUBSCRIPTION_EVENT_SINK && index == sink_index) {
     // volume change
-    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+    pa_operation_unref(pa_context_get_sink_info_by_index(context, sink_index, pa_sink_info_callback, NULL));
   }
 }
 
@@ -120,7 +119,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       fprintf(stderr, "gettimeofday failed\n");
     }
     timeout = (movie_mode_timeout+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
-    fprintf(stderr, "timeout=%d\n", timeout);
+    // fprintf(stderr, "timeout=%d\n", timeout);
   }
 
   int ret = poll(pfds, nfds+1, timeout);
@@ -143,7 +142,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     update_led();
     // if muted, unmute
     if (muted) {
-      pa_context_set_sink_mute_by_name(context, sink_name, !muted, NULL, NULL);
+      pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
     }
   }
 
@@ -178,7 +177,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         }
         // set new volume
         pa_cvolume_set(&vol, vol.channels, newvol);
-        pa_context_set_sink_volume_by_name(context, sink_name, &vol, NULL, NULL);
+        pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
@@ -186,7 +185,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
           // printf("set mute: %d\n", !muted);
-          pa_context_set_sink_mute_by_name(context, sink_name, !muted, NULL, NULL);
+          pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
         }
         else if (ev.value == 0) {
           // knob released
@@ -259,9 +258,8 @@ int main(int argc, char *argv[]) {
       state = pa_context_get_state(context);
     } while (state != PA_CONTEXT_READY);
 
-    // We're connected, get sink and volume info
+    // We're connected, get sink data
     pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
-    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
 
     // Subscribe to pulseaudio events
     pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
@@ -275,7 +273,6 @@ int main(int argc, char *argv[]) {
     // Set up our custom poll function
     pa_mainloop_set_poll_func(mainloop, poll_func, NULL);
 
-    // pa_context_state_t last_state = state;
     while (1) {
       if (pa_mainloop_iterate(mainloop, 1, NULL) < 0) {
         fprintf(stderr, "pa_mainloop_iterate failed\n");
