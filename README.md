@@ -1,6 +1,6 @@
 # PowerMate Linux Driver
 
-This is a small Linux userspace driver for the [Griffin PowerMate](https://store.griffintechnology.com/desktop/powermate). Tested only on Ubuntu 14.10 and 15.04.
+This is a small Linux userspace driver for the [Griffin PowerMate](https://store.griffintechnology.com/desktop/powermate). Tested only on Ubuntu 14.10, 15.04, and 15.10.
 
 For an easy to use PPA, use: https://launchpad.net/~stefansundin/+archive/ubuntu/powermate
 
@@ -35,6 +35,10 @@ Make it run automatically on login somehow. The program can handle the device be
 # Changes
 
 [![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
+
+**v4** - 2015-12-16 - [diff](https://github.com/stefansundin/powermate-linux/compare/v3...v4):
+- Detect sink change.
+- Handle louder than 100% better.
 
 **v3** - 2015-04-24 - [diff](https://github.com/stefansundin/powermate-linux/compare/v2...v3):
 - Movie mode -- hold knob down for one second to turn off LED.
