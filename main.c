@@ -26,7 +26,7 @@ pa_cvolume vol;
 short muted = 0;
 short movie_mode = 0;
 
-void set_led(val) {
+void set_led(int val) {
   // printf("set_led(%d)\n", val);
   struct input_event ev;
   memset(&ev, 0, sizeof(ev));
@@ -66,7 +66,15 @@ void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eo
 }
 
 void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
-  if ((t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) == PA_SUBSCRIPTION_EVENT_SINK) {
+  pa_subscription_event_type_t type = t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
+  // printf("new event: %04x (type: %04x)\n", t, type);
+  if (type == PA_SUBSCRIPTION_EVENT_SERVER) {
+    // sink might have changed, get new sink name and refresh volume
+    pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
+    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+  }
+  else if (type == PA_SUBSCRIPTION_EVENT_SINK) {
+    // volume change
     pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
   }
 }
@@ -250,7 +258,7 @@ int main(int argc, char *argv[]) {
 
     // Subscribe to new volume events
     pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
-    pa_operation *o = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK, NULL, NULL);
+    pa_operation *o = pa_context_subscribe(context, PA_SUBSCRIPTION_MASK_SINK|PA_SUBSCRIPTION_MASK_SERVER, NULL, NULL);
     if (o == NULL) {
       fprintf(stderr, "pa_context_subscribe() failed");
       return 1;
