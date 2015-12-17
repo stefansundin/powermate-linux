@@ -26,7 +26,7 @@ pa_cvolume vol;
 short muted = 0;
 short movie_mode = 0;
 
-void set_led(int val) {
+void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
   struct input_event ev;
   memset(&ev, 0, sizeof(ev));
@@ -43,7 +43,8 @@ void update_led() {
     set_led(0);
   }
   else {
-    set_led(vol.values[0] * 255 / PA_VOLUME_NORM);
+    unsigned int val = MIN(vol.values[0], PA_VOLUME_NORM);
+    set_led(val * 255 / PA_VOLUME_NORM);
   }
 }
 
@@ -167,7 +168,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         }
         else if (ev.value == 1) {
           // clock-wise turn
-          newvol = MIN(vol.values[0] + PA_VOLUME_NORM*p/100, PA_VOLUME_NORM);
+          int maxvol = PA_VOLUME_NORM;
+          if (vol.values[0] > PA_VOLUME_NORM) {
+            // we're already above 100%, so allow volume up to 150%
+            // see "Allow louder than 100%" in sound settings
+            maxvol *= 1.50;
+          }
+          newvol = MIN(vol.values[0] + PA_VOLUME_NORM*p/100, maxvol);
         }
         // set new volume
         pa_cvolume_set(&vol, vol.channels, newvol);
