@@ -6,6 +6,7 @@
 #include <poll.h>
 #include <linux/input.h>
 #include <pulse/pulseaudio.h>
+#include <libnotify/notify.h>
 
 // Some example code:
 // http://sowerbutts.com/powermate/
@@ -25,6 +26,7 @@ pa_context *context = NULL;
 pa_cvolume vol;
 short muted = 0;
 short movie_mode = 0;
+NotifyNotification *notification;
 
 void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
@@ -77,6 +79,16 @@ void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint
     // volume change
     pa_operation_unref(pa_context_get_sink_info_by_index(context, sink_index, pa_sink_info_callback, NULL));
   }
+}
+
+void
+notify(const char *message)
+{
+    notify_notification_update(notification, message, NULL, "/usr/share/icons/gnome/32x32/status/stock_volume.png");
+    notify_notification_set_category(notification, "string");
+    notify_notification_set_urgency(notification, NOTIFY_URGENCY_NORMAL);
+    notify_notification_set_timeout(notification, 1000);
+    notify_notification_show(notification, NULL);
 }
 
 int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userdata) {
@@ -178,6 +190,10 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         // set new volume
         pa_cvolume_set(&vol, vol.channels, newvol);
         pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+
+        char message[50];
+        sprintf (message, "Volume %i%%", (int)((newvol/65536.0)*100.f));
+        notify(message);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
@@ -230,6 +246,10 @@ int main(int argc, char *argv[]) {
     printf("Just became a daemon, deal with it!\n");
     return 0;
   }
+
+  if (!notify_init("powermate"))
+    fprintf(stderr, "Could not initialize libnotify.\n");
+  notification = notify_notification_new(NULL, NULL, NULL);
 
   while (1) {
     // PulseAudio
@@ -289,6 +309,8 @@ int main(int argc, char *argv[]) {
 
     pa_context_disconnect(context);
     pa_mainloop_free(mainloop);
+
+    notify_uninit();
   }
 
   return 0;
