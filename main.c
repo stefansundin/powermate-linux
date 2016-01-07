@@ -82,13 +82,29 @@ void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint
 }
 
 void
-notify(const char *message)
-{
-    notify_notification_update(notification, message, NULL, "/usr/share/icons/gnome/32x32/status/stock_volume.png");
-    notify_notification_set_category(notification, "string");
-    notify_notification_set_urgency(notification, NOTIFY_URGENCY_NORMAL);
-    notify_notification_set_timeout(notification, 1000);
-    notify_notification_show(notification, NULL);
+init_libnotify() {
+  if (!notify_init("powermate"))
+    fprintf(stderr, "Could not initialize libnotify.\n");
+  notification = notify_notification_new(NULL, NULL, NULL);
+  notify_notification_set_category(notification, "string");
+  notify_notification_set_urgency(notification, NOTIFY_URGENCY_NORMAL);
+  notify_notification_set_timeout(notification, 1000);
+}
+
+void
+notify(const char *message, unsigned int trycount) {
+  GError *error = NULL;
+
+  notify_notification_update(notification, message, NULL, "/usr/share/icons/gnome/32x32/status/stock_volume.png");
+  if (!notify_notification_show (notification, &error)) {
+    fprintf (stderr, "failed to send notification: %s\n", error->message);
+     g_error_free (error);
+     if (trycount < 10) {
+       notify_uninit();
+       init_libnotify();
+       notify(message, trycount+1);
+     }
+  }
 }
 
 int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userdata) {
@@ -193,7 +209,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 
         char message[50];
         sprintf (message, "Volume %i%%", (int)((newvol/65536.0)*100.f));
-        notify(message);
+        notify(message, 0);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
@@ -247,9 +263,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  if (!notify_init("powermate"))
-    fprintf(stderr, "Could not initialize libnotify.\n");
-  notification = notify_notification_new(NULL, NULL, NULL);
+  init_libnotify();
 
   while (1) {
     // PulseAudio
