@@ -32,6 +32,14 @@ Simply run the executable with `./powermate`.
 Make it run automatically on login somehow. The program can handle the device being disconnected and connected without problems.
 
 
+# Compile
+
+```bash
+sudo apt-get install libpulse-dev libnotify-dev
+make
+```
+
+
 # Changes
 
 [![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
