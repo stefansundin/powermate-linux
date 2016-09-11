@@ -1,6 +1,6 @@
 # PowerMate Linux Driver
 
-This is a small Linux userspace driver for the [Griffin PowerMate](https://store.griffintechnology.com/desktop/powermate). Tested only on Ubuntu 14.10, 15.04, and 15.10.
+This is a small Linux userspace driver for the [Griffin PowerMate](https://griffintechnology.com/us/products/audio/powermate). Tested only on Ubuntu 14.10, 15.04, and 15.10.
 
 For an easy to use PPA, use: https://launchpad.net/~stefansundin/+archive/ubuntu/powermate
 
