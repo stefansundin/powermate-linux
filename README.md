@@ -15,30 +15,30 @@ This software is written by Stefan Sundin and is licensed under GPLv3.
 # Installation
 
 ## Clone Git Repository to Working Directory
-'''bash
+```bash
 $ git clone https://github.com/stefansundin/powermate-linux.git
-'''
+```
 This will clone the latest version of the PowerMate drivers to your current directory.
 
 cd into the new directory
-'''bash
+```bash
 $ cd powermate-linux
-'''
+```
 
 
 ## Set udev rule
-'''bash
+```bash
 $ sudo cp 60-powermate.rules /etc/udev/rules.d 
-'''
+```
 
 After copying the file, unplug and plug the device back in. 
 
 ## Compile
 Install library requirements and then compile:
-'''bash 
+```bash 
 $ sudo apt-get install libpulse-dev libnotify-dev
 $ make
-'''
+```
 
 ## Run
 
@@ -46,15 +46,15 @@ Simply run the executable with `./powermate`
 
 Make it run automatically on login somehow. The program can handle the device being disconnected and connected without problems. 
 One method to automatically run the program on boot is using cron. To set this up, run the following commands:
-'''bash
+```bash
 $ crontab -e 
-'''
+```
 
 Then, add this line to your crontab substituting in 'PATH_TO_INSTALL' with your specific directory containing the powermate program:
 
-'''
+```
 @reboot /home/$USER/PATH_TO_INSTALL/powermate
-'''
+```
 
 
 
