@@ -14,30 +14,48 @@ This software is written by Stefan Sundin and is licensed under GPLv3.
 
 # Installation
 
-Create a udev rule by creating the file `/etc/udev/rules.d/60-powermate.rules`
+## Clone Git Repository to Working Directory
+'''bash
+$ git clone https://github.com/stefansundin/powermate-linux.git
+'''
+This will clone the latest version of the PowerMate drivers to your current directory.
 
-```
-ACTION=="add", ENV{ID_USB_DRIVER}=="powermate", SYMLINK+="input/powermate", MODE="0666"
-```
-
-After creating the file, unplug and plug the device back in.
-
-Download the binary [here](https://github.com/stefansundin/powermate-linux/releases/latest).
-
-
-# Run
-
-Simply run the executable with `./powermate`.
-
-Make it run automatically on login somehow. The program can handle the device being disconnected and connected without problems.
+cd into the new directory
+'''bash
+$ cd powermate-linux
+'''
 
 
-# Compile
+## Set udev rule
+'''bash
+$ sudo cp 60-powermate.rules /etc/udev/rules.d 
+'''
 
-```bash
-sudo apt-get install libpulse-dev libnotify-dev
-make
-```
+After copying the file, unplug and plug the device back in. 
+
+## Compile
+Install library requirements and then compile:
+'''bash 
+$ sudo apt-get install libpulse-dev libnotify-dev
+$ make
+'''
+
+## Run
+
+Simply run the executable with `./powermate`
+
+Make it run automatically on login somehow. The program can handle the device being disconnected and connected without problems. 
+One method to automatically run the program on boot is using cron. To set this up, run the following commands:
+'''bash
+$ crontab -e 
+'''
+
+Then, add this line to your crontab substituting in 'PATH_TO_INSTALL' with your specific directory containing the powermate program:
+
+'''
+@reboot /home/$USER/PATH_TO_INSTALL/powermate
+'''
+
 
 
 # Changes
