@@ -7,6 +7,9 @@
 #include <linux/input.h>
 #include <pulse/pulseaudio.h>
 
+// required: libxdo-dev
+#include <xdo.h>
+
 // Some example code:
 // http://sowerbutts.com/powermate/
 
@@ -25,6 +28,8 @@ pa_context *context = NULL;
 pa_cvolume vol;
 short muted = 0;
 short movie_mode = 0;
+
+xdo_t *x = NULL;
 
 void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
@@ -142,7 +147,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     update_led();
     // if muted, unmute
     if (muted) {
-      pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+      xdo_send_keysequence_window(x, CURRENTWINDOW, "XF86AudioPlay", 0);
     }
   }
 
@@ -185,7 +190,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
           // printf("set mute: %d\n", !muted);
-          pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          xdo_send_keysequence_window(x, CURRENTWINDOW, "XF86AudioPlay", 0);
         }
         else if (ev.value == 0) {
           // knob released
@@ -230,6 +235,8 @@ int main(int argc, char *argv[]) {
     printf("Just became a daemon, deal with it!\n");
     return 0;
   }
+
+  x = xdo_new(NULL);
 
   while (1) {
     // PulseAudio
@@ -291,5 +298,6 @@ int main(int argc, char *argv[]) {
     pa_mainloop_free(mainloop);
   }
 
+  xdo_free(x);
   return 0;
 }

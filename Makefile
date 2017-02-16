@@ -1,7 +1,7 @@
 # sudo apt-get install libpulse-dev libnotify-dev
 
 CFLAGS = -O2 -s -Wall $(shell pkg-config --cflags libpulse libnotify)
-LIBS = `pkg-config --libs libpulse libnotify`
+LIBS = `pkg-config --libs libpulse libnotify` -lxdo
 
 powermate: main.c
 	gcc -o powermate main.c $(CFLAGS) $(LIBS)
