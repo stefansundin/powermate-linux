@@ -1,6 +1,9 @@
 powermate
 powermate32
 
+/debian
+/build-stamp
+
 Thumbs.db
 .DS_Store
 *.swp
