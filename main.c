@@ -43,7 +43,8 @@ void update_led() {
     set_led(0);
   }
   else {
-    unsigned int val = MIN(vol.values[0], PA_VOLUME_NORM);
+    const pa_volume_t avg_vol = pa_cvolume_avg(&vol);
+    unsigned int val = MIN(avg_vol, PA_VOLUME_NORM);
     set_led(val * 255 / PA_VOLUME_NORM);
   }
 }
@@ -53,7 +54,8 @@ void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eo
     return;
   }
   sink_index = info->index;
-  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
+  const pa_volume_t avg_vol = pa_cvolume_avg(&info->volume);
+  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, avg_vol, avg_vol*100.0/PA_VOLUME_NORM, info->mute);
 
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
@@ -156,27 +158,25 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     }
     else {
       if (ev.type == EV_REL && ev.code == 7) {
-        pa_volume_t newvol = vol.values[0];
+        const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
           // counter clock-wise turn
-          newvol = vol.values[0] - PA_VOLUME_NORM*p/100;
-          if (newvol > vol.values[0]) {
-            // we wrapped around, clamp to 0
-            newvol = 0;
+          if (pa_cvolume_min(&vol) >= step) {
+            // volume can be decreased without affecting the balance
+            pa_cvolume_dec(&vol, step);
           }
         }
         else if (ev.value == 1) {
           // clock-wise turn
           int maxvol = PA_VOLUME_NORM;
-          if (vol.values[0] > PA_VOLUME_NORM) {
+          if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
             // we're already above 100%, so allow volume up to 150%
             // see "Allow louder than 100%" in sound settings
             maxvol *= 1.50;
           }
-          newvol = MIN(vol.values[0] + PA_VOLUME_NORM*p/100, maxvol);
+          pa_cvolume_inc_clamp(&vol, step, maxvol);
         }
         // set new volume
-        pa_cvolume_set(&vol, vol.channels, newvol);
         pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
