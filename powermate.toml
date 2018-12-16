@@ -1,0 +1,7 @@
+# The program checks for configuration files in the following order:
+# - $HOME/.powermate.toml
+# - /etc/powermate.toml
+# If a file cannot be found, the defaults settings correspond to the values in this file.
+
+# Whether to daemonize the process or not:
+daemonize = false

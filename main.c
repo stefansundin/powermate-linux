@@ -6,16 +6,21 @@
 #include <poll.h>
 #include <linux/input.h>
 #include <pulse/pulseaudio.h>
+#include "tomlc99/toml.h"
 
 // Some example code:
 // http://sowerbutts.com/powermate/
 
+// Settings
 char dev[] = "/dev/input/powermate";
 int p = 2;
 int movie_mode_timeout = 1000; // milliseconds
 
-int devfd = 0;
+// State
+short muted = 0;
+short movie_mode = 0;
 short knob_depressed = 0;
+int devfd = 0;
 struct timeval knob_depressed_timestamp;
 
 struct pollfd *pfds = NULL;
@@ -23,8 +28,6 @@ int pa_nfds = 0;
 int sink_index = -1;
 pa_context *context = NULL;
 pa_cvolume vol;
-short muted = 0;
-short movie_mode = 0;
 
 void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
@@ -202,6 +205,55 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 }
 
 int main(int argc, char *argv[]) {
+  // Settings
+  int daemonize = 0;
+
+  // Load config file
+  {
+    char config_path[255] = "";
+    char *homedir = getenv("HOME");
+    if (homedir != NULL) {
+      sprintf(config_path, "%s/.powermate.toml", homedir);
+      if (access(config_path, F_OK) != 0) {
+        config_path[0] = '\0';
+      }
+    }
+    if (config_path[0] == '\0') {
+      strcpy(config_path, "/etc/powermate.toml");
+    }
+
+    if (access(config_path, F_OK) == 0) {
+      printf("Loading config from %s\n", config_path);
+
+      FILE *f;
+      if ((f = fopen(config_path, "r")) == NULL) {
+        fprintf(stderr, "Failed to open file.\n");
+      }
+      else {
+        char errbuf[200];
+        toml_table_t *conf = toml_parse_file(f, errbuf, sizeof(errbuf));
+        fclose(f);
+        if (conf == 0) {
+          fprintf(stderr, "Error: %s\n", errbuf);
+        }
+        else {
+          const char *raw;
+          if ((raw=toml_raw_in(conf,"daemonize")) != 0 && toml_rtob(raw,&daemonize)) {
+            fprintf(stderr, "Warning: bad value in 'daemonize', expected boolean.\n");
+          }
+        }
+      }
+    }
+    else {
+      printf("Config file not found, using defaults. Checked the following paths:\n");
+      if (homedir != NULL) {
+        printf("- %s/.powermate.toml\n", homedir);
+      }
+      printf("- /etc/powermate.toml\n");
+      printf("\n");
+    }
+  }
+
   // Test device
   devfd = open(dev, O_RDWR);
   if (devfd == -1) {
@@ -211,24 +263,26 @@ int main(int argc, char *argv[]) {
   }
 
   // Daemonize
-  int pid = fork();
-  if (pid == 0) {
-    // We're the child process!
-    // Release handle to working directory
-    if (chdir("/") < 0) {
-      fprintf(stderr, "chdir() failed");
+  if (daemonize) {
+    int pid = fork();
+    if (pid == 0) {
+      // We're the child process!
+      // Release handle to the working directory
+      if (chdir("/") < 0) {
+        fprintf(stderr, "chdir() failed");
+      }
+      // Close things
+      fclose(stdin);
+      fclose(stdout);
+      fclose(stderr);
     }
-    // Close things
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
-  }
-  else if (pid < 0) {
-    fprintf(stderr, "Failed to become a daemon, whatevs.\n");
-  }
-  else {
-    printf("Just became a daemon, deal with it!\n");
-    return 0;
+    else if (pid < 0) {
+      fprintf(stderr, "Failed to become a daemon.\n");
+    }
+    else {
+      printf("Just became a daemon.\n");
+      return 0;
+    }
   }
 
   while (1) {

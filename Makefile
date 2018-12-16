@@ -1,7 +1,7 @@
 # sudo apt-get install libpulse-dev libnotify-dev
 
 CFLAGS = -O2 -s -Wall -Wl,--as-needed $(shell pkg-config --cflags libpulse libnotify)
-LIBS = `pkg-config --libs libpulse libnotify`
+LIBS = tomlc99/toml.c `pkg-config --libs libpulse libnotify`
 
 powermate: main.c
 	gcc -o powermate main.c $(CFLAGS) $(LIBS)
