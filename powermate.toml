@@ -5,3 +5,6 @@
 
 # Whether to daemonize the process or not:
 daemonize = false
+
+# How much (in percent) to change the volume for each step:
+p = 2.0

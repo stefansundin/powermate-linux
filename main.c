@@ -13,7 +13,7 @@
 
 // Settings
 char dev[] = "/dev/input/powermate";
-int p = 2;
+double p = 2.0;
 int movie_mode_timeout = 1000; // milliseconds
 
 // State
@@ -238,8 +238,11 @@ int main(int argc, char *argv[]) {
         }
         else {
           const char *raw;
-          if ((raw=toml_raw_in(conf,"daemonize")) != 0 && toml_rtob(raw,&daemonize)) {
-            fprintf(stderr, "Warning: bad value in 'daemonize', expected boolean.\n");
+          if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
+            fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
+          }
+          if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
+            fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
         }
       }
