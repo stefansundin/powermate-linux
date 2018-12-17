@@ -12,7 +12,7 @@
 // http://sowerbutts.com/powermate/
 
 // Settings
-char dev[] = "/dev/input/powermate";
+char *dev = "/dev/input/powermate";
 double p = 2.0;
 int movie_mode_timeout = 1000; // milliseconds
 
@@ -101,7 +101,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     fprintf(stderr, "Attempting to open %s\n", dev);
     devfd = open(dev, O_RDWR);
     if (devfd == -1) {
-      fprintf(stderr, "Could not open %s: %s\n", dev, strerror(errno));
+      fprintf(stderr, "Error: %s\n", strerror(errno));
       sleep(1);
     }
     else {
@@ -238,6 +238,9 @@ int main(int argc, char *argv[]) {
         }
         else {
           const char *raw;
+          if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
+            fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
+          }
           if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
           }
