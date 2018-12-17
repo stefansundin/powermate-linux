@@ -14,7 +14,11 @@
 // Settings
 char *dev = "/dev/input/powermate";
 double p = 2.0;
-int movie_mode_timeout = 1000; // milliseconds
+char *knob_command = NULL;
+char *long_press_command = NULL;
+char *clock_wise_command = NULL;
+char *counter_clock_wise_command = NULL;
+int64_t long_press_ms = 1000;
 
 // State
 short muted = 0;
@@ -28,6 +32,17 @@ int pa_nfds = 0;
 int sink_index = -1;
 pa_context *context = NULL;
 pa_cvolume vol;
+
+void exec_command(char *command) {
+  if (command == NULL || command[0] == '\0') {
+    return;
+  }
+  printf("Executing: %s\n", command);
+  int ret = system(command);
+  if (ret != 0) {
+    printf("Return value: %d\n", ret);
+  }
+}
 
 void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
@@ -117,13 +132,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   pfds[nfds].events = POLLIN;
   pfds[nfds].revents = 0;
 
-  // if knob is depressed, we need to timeout for the sake of detecting movie mode
-  if (knob_depressed) {
+  // if the knob is depressed, then we need to timeout for the sake of detecting a long press
+  if (knob_depressed && (long_press_command == NULL || long_press_command[0] != '\0')) {
     struct timeval now;
     if (gettimeofday(&now, NULL) < 0) {
       fprintf(stderr, "gettimeofday failed\n");
     }
-    timeout = (movie_mode_timeout+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
+    timeout = (long_press_ms+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
     // fprintf(stderr, "timeout=%d\n", timeout);
   }
 
@@ -140,15 +155,19 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 
   if (knob_depressed && ret == 0) {
     // timer ran out
-    // fprintf(stderr, "knob depressed for %d milliseconds!\n", movie_mode_timeout);
     knob_depressed = 0;
-    movie_mode = !movie_mode;
-    printf("Movie mode: %d\n", movie_mode);
-    update_led();
-    // if muted, unmute
-    if (muted) {
+    // if muted, and we muted it when depressing the knob in the first place, then unmute
+    if (muted && knob_command == NULL) {
       pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
     }
+    if (long_press_command == NULL) {
+      movie_mode = !movie_mode;
+      printf("Movie mode: %d\n", movie_mode);
+    }
+    else {
+      exec_command(long_press_command);
+    }
+    update_led();
   }
 
   if (pfds[nfds].revents > 0) {
@@ -163,32 +182,46 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       if (ev.type == EV_REL && ev.code == 7) {
         const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
-          // counter clock-wise turn
-          if (pa_cvolume_min(&vol) >= step) {
-            // volume can be decreased without affecting the balance
-            pa_cvolume_dec(&vol, step);
+          // counter clockwise turn
+          if (counter_clock_wise_command == NULL) {
+            if (pa_cvolume_min(&vol) >= step) {
+              // volume can be decreased without affecting the balance
+              pa_cvolume_dec(&vol, step);
+            }
+            pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+          }
+          else {
+            exec_command(counter_clock_wise_command);
           }
         }
         else if (ev.value == 1) {
-          // clock-wise turn
-          int maxvol = PA_VOLUME_NORM;
-          if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
-            // we're already above 100%, so allow volume up to 150%
-            // see "Allow louder than 100%" in sound settings
-            maxvol *= 1.50;
+          // clockwise turn
+          if (clock_wise_command == NULL) {
+            int maxvol = PA_VOLUME_NORM;
+            if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+              // we're already above 100%, so allow volume up to 150%
+              // see "Allow louder than 100%" in sound settings
+              maxvol *= 1.50;
+            }
+            pa_cvolume_inc_clamp(&vol, step, maxvol);
+            pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
           }
-          pa_cvolume_inc_clamp(&vol, step, maxvol);
+          else {
+            exec_command(clock_wise_command);
+          }
         }
-        // set new volume
-        pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
           // knob depressed
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
-          // printf("set mute: %d\n", !muted);
-          pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          if (knob_command == NULL) {
+            pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          }
+          else {
+            exec_command(knob_command);
+          }
         }
         else if (ev.value == 0) {
           // knob released
@@ -246,6 +279,21 @@ int main(int argc, char *argv[]) {
           }
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
+          }
+          if ((raw=toml_raw_in(conf,"knob_command")) && toml_rtos(raw,&knob_command)) {
+            fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"long_press_command")) && toml_rtos(raw,&long_press_command)) {
+            fprintf(stderr, "Warning: bad value in 'long_press_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"clock_wise_command")) && toml_rtos(raw,&clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
+            fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
           }
         }
       }
