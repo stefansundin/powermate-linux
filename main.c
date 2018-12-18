@@ -329,6 +329,13 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  int i;
+  for (i=1; i < argc; i++) {
+    if (!strcmp(argv[i], "-d")) {
+      daemonize = 1;
+    }
+  }
+
   // Test device
   devfd = open(dev, O_RDWR);
   if (devfd == -1) {
