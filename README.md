@@ -47,3 +47,12 @@ Simply run the executable with `./powermate`.
 The program should be able to handle the device being disconnected and connected without problems.
 
 Make it run automatically on login somehow. If you are running a standard desktop environment then there is usually a "Startup Applications" preference. This is automatically installed if you use the PPA.
+
+You can use `./powermate -d` to daemonize the program without having to update the config file.
+
+
+# Configuration
+
+By default, the program changes the volume when you turn the knob clockwise and counter clockwise, but you are able to customize the program to do anything via [the configuration file](powermate.toml).
+
+Press the knob to mute. Hold down the knob for one second to activate "movie mode". Operation is the same except the LED stays off.
