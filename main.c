@@ -61,19 +61,38 @@ void update_led() {
     set_led(0);
   }
   else {
-    const pa_volume_t avg_vol = pa_cvolume_avg(&vol);
-    unsigned int val = MIN(avg_vol, PA_VOLUME_NORM);
+    const pa_volume_t max_vol = pa_cvolume_max(&vol);
+    unsigned int val = MIN(max_vol, PA_VOLUME_NORM);
     set_led(val * 255 / PA_VOLUME_NORM);
   }
 }
 
-void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eol, void* userdata) {
+// based on https://github.com/pulseaudio/pulseaudio/blob/v12.2/src/pulse/volume.c#L456-L468
+int pa_cvolume_channels_equal(const pa_cvolume *a) {
+  unsigned c;
+  for (c = 1; c < a->channels; c++)
+    if (a->values[c] != a->values[0])
+      return 0;
+  return 1;
+}
+
+// based on https://github.com/pulseaudio/pulseaudio/blob/v12.2/src/pulse/volume.c#L141-L153
+pa_volume_t pa_cvolume_min_unmuted(const pa_cvolume *a) {
+  pa_volume_t m = PA_VOLUME_MAX;
+  unsigned c;
+  for (c = 0; c < a->channels; c++)
+    if (a->values[c] < m && a->values[c] != 0)
+      m = a->values[c];
+  return m;
+}
+
+void pa_sink_info_callback(pa_context *context, const pa_sink_info *info, int eol, void *userdata) {
   if (eol) {
     return;
   }
   sink_index = info->index;
-  const pa_volume_t avg_vol = pa_cvolume_avg(&info->volume);
-  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, avg_vol, avg_vol*100.0/PA_VOLUME_NORM, info->mute);
+  const pa_volume_t max_vol = pa_cvolume_max(&info->volume);
+  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, max_vol, max_vol*100.0/PA_VOLUME_NORM, info->mute);
 
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
@@ -184,11 +203,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         if (ev.value == -1) {
           // counter clockwise turn
           if (counter_clock_wise_command == NULL) {
-            if (pa_cvolume_min(&vol) >= step) {
-              // volume can be decreased without affecting the balance
+            if (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step) {
+              // we can lower the volume and maintain the balance if:
+              // 1. there is no inbalance (all channels have the same volume)
+              // 2. min volume on unmuted channels is greater than the step
               pa_cvolume_dec(&vol, step);
+              pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
             }
-            pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
           }
           else {
             exec_command(counter_clock_wise_command);
