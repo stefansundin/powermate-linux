@@ -14,51 +14,45 @@ This software is written by Stefan Sundin and is licensed under GPLv3.
 
 # Installation
 
-Create a udev rule by creating the file `/etc/udev/rules.d/60-powermate.rules`
+Binaries are available [in the releases section](https://github.com/stefansundin/powermate-linux/releases).
 
+## Clone Repository
+
+```bash
+$ git clone https://github.com/stefansundin/powermate-linux.git
+$ cd powermate-linux
 ```
-ACTION=="add", ENV{ID_USB_DRIVER}=="powermate", SYMLINK+="input/powermate", MODE="0666"
+
+## Setup udev rule
+
+```bash
+$ sudo cp 60-powermate.rules /etc/udev/rules.d/
 ```
 
-After creating the file, unplug and plug the device back in.
+After copying the file, unplug and plug the device back in.
 
-Download the binary [here](https://github.com/stefansundin/powermate-linux/releases/latest).
+## Compile
 
+Install requirements and then compile:
 
-# Run
+```bash
+$ sudo apt-get install libpulse-dev libnotify-dev
+$ make
+```
+
+## Run
 
 Simply run the executable with `./powermate`.
 
-Make it run automatically on login somehow. The program can handle the device being disconnected and connected without problems.
+The program should be able to handle the device being disconnected and connected without problems.
+
+Make it run automatically on login somehow. If you are running a standard desktop environment then there is usually a "Startup Applications" preference. This is automatically installed if you use the PPA.
+
+You can use `./powermate -d` to daemonize the program without having to update the config file.
 
 
-# Compile
+# Configuration
 
-```bash
-sudo apt-get install libpulse-dev libnotify-dev
-make
-```
+By default, the program changes the volume when you turn the knob clockwise and counter clockwise, but you are able to customize the program to do anything via [the configuration file](powermate.toml).
 
-
-# Changes
-
-[![RSS](https://stefansundin.github.io/img/feed.png) Release feed](https://github.com/stefansundin/powermate-linux/releases.atom)
-
-**v5** - 2015-12-16 - [diff](https://github.com/stefansundin/powermate-linux/compare/v4...v5):
-- Properly detect new sink volume.
-
-**v4** - 2015-12-16 - [diff](https://github.com/stefansundin/powermate-linux/compare/v3...v4):
-- Detect sink change.
-- Handle louder than 100% better.
-
-**v3** - 2015-04-24 - [diff](https://github.com/stefansundin/powermate-linux/compare/v2...v3):
-- Movie mode -- hold knob down for one second to turn off LED.
-- Device no longer has to be connected when program starts.
-- Program is now single-threaded.
-
-**v2** - 2015-04-11 - [diff](https://github.com/stefansundin/powermate-linux/compare/v1...v2):
-- The LED is now updated when the volume changes.
-- The program now uses PulseAudio directly. If this is an issue for you, use [v1](https://github.com/stefansundin/powermate-linux/releases/tag/v1).
-
-**v1** - 2015-04-09:
-- Initial release.
+Press the knob to mute. Hold down the knob for one second to activate "movie mode". Operation is the same except the LED stays off.

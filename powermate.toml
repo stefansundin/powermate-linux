@@ -1,0 +1,32 @@
+# The program checks for configuration files in the following order:
+# - $HOME/.powermate.toml
+# - /etc/powermate.toml
+# If a file cannot be found, the defaults settings correspond to the values in this file.
+
+# Path to device:
+dev = "/dev/input/powermate"
+
+# Whether to daemonize the process or not:
+daemonize = false
+
+# How much (in percent) to change the volume for each step:
+p = 2.0
+
+# Custom commands (will disable default behavior).
+# Set to an empty string to disable the default behavior without executing a custom command.
+# knob_command = "" # Default: mute/unmute
+# long_press_command = "" # Default: toggle movie mode (disables the LED)
+# clock_wise_command = "" # Default: increases the volume by p%
+# counter_clock_wise_command = "" # Default: decreases the volume by p%
+
+# Timeouts (in milliseconds)
+long_press_ms = 1000
+
+# Handy commands:
+# xdotool key XF86AudioPlay
+# xdotool key XF86AudioPrev
+# xdotool key XF86AudioNext
+# xdotool key XF86AudioLowerVolume
+# xdotool key XF86AudioRaiseVolume
+# xdotool key XF86AudioMute
+# systemctl suspend

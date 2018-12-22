@@ -6,16 +6,25 @@
 #include <poll.h>
 #include <linux/input.h>
 #include <pulse/pulseaudio.h>
+#include "tomlc99/toml.h"
 
 // Some example code:
 // http://sowerbutts.com/powermate/
 
-char dev[] = "/dev/input/powermate";
-int p = 2;
-int movie_mode_timeout = 1000; // milliseconds
+// Settings
+char *dev = "/dev/input/powermate";
+double p = 2.0;
+char *knob_command = NULL;
+char *long_press_command = NULL;
+char *clock_wise_command = NULL;
+char *counter_clock_wise_command = NULL;
+int64_t long_press_ms = 1000;
 
-int devfd = 0;
+// State
+short muted = 0;
+short movie_mode = 0;
 short knob_depressed = 0;
+int devfd = 0;
 struct timeval knob_depressed_timestamp;
 
 struct pollfd *pfds = NULL;
@@ -23,8 +32,17 @@ int pa_nfds = 0;
 int sink_index = -1;
 pa_context *context = NULL;
 pa_cvolume vol;
-short muted = 0;
-short movie_mode = 0;
+
+void exec_command(char *command) {
+  if (command == NULL || command[0] == '\0') {
+    return;
+  }
+  printf("Executing: %s\n", command);
+  int ret = system(command);
+  if (ret != 0) {
+    printf("Return value: %d\n", ret);
+  }
+}
 
 void set_led(unsigned int val) {
   // printf("set_led(%d)\n", val);
@@ -43,17 +61,38 @@ void update_led() {
     set_led(0);
   }
   else {
-    unsigned int val = MIN(vol.values[0], PA_VOLUME_NORM);
+    const pa_volume_t max_vol = pa_cvolume_max(&vol);
+    unsigned int val = MIN(max_vol, PA_VOLUME_NORM);
     set_led(val * 255 / PA_VOLUME_NORM);
   }
 }
 
-void pa_sink_info_callback(pa_context* context, const pa_sink_info* info, int eol, void* userdata) {
+// based on https://github.com/pulseaudio/pulseaudio/blob/v12.2/src/pulse/volume.c#L456-L468
+int pa_cvolume_channels_equal(const pa_cvolume *a) {
+  unsigned c;
+  for (c = 1; c < a->channels; c++)
+    if (a->values[c] != a->values[0])
+      return 0;
+  return 1;
+}
+
+// based on https://github.com/pulseaudio/pulseaudio/blob/v12.2/src/pulse/volume.c#L141-L153
+pa_volume_t pa_cvolume_min_unmuted(const pa_cvolume *a) {
+  pa_volume_t m = PA_VOLUME_MAX;
+  unsigned c;
+  for (c = 0; c < a->channels; c++)
+    if (a->values[c] < m && a->values[c] != 0)
+      m = a->values[c];
+  return m;
+}
+
+void pa_sink_info_callback(pa_context *context, const pa_sink_info *info, int eol, void *userdata) {
   if (eol) {
     return;
   }
   sink_index = info->index;
-  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, info->volume.values[0], info->volume.values[0]*100.0/PA_VOLUME_NORM, info->mute);
+  const pa_volume_t max_vol = pa_cvolume_max(&info->volume);
+  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, max_vol, max_vol*100.0/PA_VOLUME_NORM, info->mute);
 
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
@@ -96,7 +135,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     fprintf(stderr, "Attempting to open %s\n", dev);
     devfd = open(dev, O_RDWR);
     if (devfd == -1) {
-      fprintf(stderr, "Could not open %s: %s\n", dev, strerror(errno));
+      fprintf(stderr, "Error: %s\n", strerror(errno));
       sleep(1);
     }
     else {
@@ -112,13 +151,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   pfds[nfds].events = POLLIN;
   pfds[nfds].revents = 0;
 
-  // if knob is depressed, we need to timeout for the sake of detecting movie mode
-  if (knob_depressed) {
+  // if the knob is depressed, then we need to timeout for the sake of detecting a long press
+  if (knob_depressed && (long_press_command == NULL || long_press_command[0] != '\0')) {
     struct timeval now;
     if (gettimeofday(&now, NULL) < 0) {
       fprintf(stderr, "gettimeofday failed\n");
     }
-    timeout = (movie_mode_timeout+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
+    timeout = (long_press_ms+knob_depressed_timestamp.tv_sec*1000+knob_depressed_timestamp.tv_usec/1000) - (now.tv_sec*1000+now.tv_usec/1000);
     // fprintf(stderr, "timeout=%d\n", timeout);
   }
 
@@ -135,15 +174,19 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 
   if (knob_depressed && ret == 0) {
     // timer ran out
-    // fprintf(stderr, "knob depressed for %d milliseconds!\n", movie_mode_timeout);
     knob_depressed = 0;
-    movie_mode = !movie_mode;
-    printf("Movie mode: %d\n", movie_mode);
-    update_led();
-    // if muted, unmute
-    if (muted) {
+    // if muted, and we muted it when depressing the knob in the first place, then unmute
+    if (muted && knob_command == NULL) {
       pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
     }
+    if (long_press_command == NULL) {
+      movie_mode = !movie_mode;
+      printf("Movie mode: %d\n", movie_mode);
+    }
+    else {
+      exec_command(long_press_command);
+    }
+    update_led();
   }
 
   if (pfds[nfds].revents > 0) {
@@ -156,36 +199,50 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     }
     else {
       if (ev.type == EV_REL && ev.code == 7) {
-        pa_volume_t newvol = vol.values[0];
+        const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
-          // counter clock-wise turn
-          newvol = vol.values[0] - PA_VOLUME_NORM*p/100;
-          if (newvol > vol.values[0]) {
-            // we wrapped around, clamp to 0
-            newvol = 0;
+          // counter clockwise turn
+          if (counter_clock_wise_command == NULL) {
+            if (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step) {
+              // we can lower the volume and maintain the balance if:
+              // 1. there is no inbalance (all channels have the same volume)
+              // 2. min volume on unmuted channels is greater than the step
+              pa_cvolume_dec(&vol, step);
+              pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+            }
+          }
+          else {
+            exec_command(counter_clock_wise_command);
           }
         }
         else if (ev.value == 1) {
-          // clock-wise turn
-          int maxvol = PA_VOLUME_NORM;
-          if (vol.values[0] > PA_VOLUME_NORM) {
-            // we're already above 100%, so allow volume up to 150%
-            // see "Allow louder than 100%" in sound settings
-            maxvol *= 1.50;
+          // clockwise turn
+          if (clock_wise_command == NULL) {
+            int maxvol = PA_VOLUME_NORM;
+            if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+              // we're already above 100%, so allow volume up to 150%
+              // see "Allow louder than 100%" in sound settings
+              maxvol *= 1.50;
+            }
+            pa_cvolume_inc_clamp(&vol, step, maxvol);
+            pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
           }
-          newvol = MIN(vol.values[0] + PA_VOLUME_NORM*p/100, maxvol);
+          else {
+            exec_command(clock_wise_command);
+          }
         }
-        // set new volume
-        pa_cvolume_set(&vol, vol.channels, newvol);
-        pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
       }
       else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
           // knob depressed
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
-          // printf("set mute: %d\n", !muted);
-          pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          if (knob_command == NULL) {
+            pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          }
+          else {
+            exec_command(knob_command);
+          }
         }
         else if (ev.value == 0) {
           // knob released
@@ -202,6 +259,83 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 }
 
 int main(int argc, char *argv[]) {
+  // Settings
+  int daemonize = 0;
+
+  // Load config file
+  {
+    char config_path[255] = "";
+    char *homedir = getenv("HOME");
+    if (homedir != NULL) {
+      sprintf(config_path, "%s/.powermate.toml", homedir);
+      if (access(config_path, F_OK) != 0) {
+        config_path[0] = '\0';
+      }
+    }
+    if (config_path[0] == '\0') {
+      strcpy(config_path, "/etc/powermate.toml");
+    }
+
+    if (access(config_path, F_OK) == 0) {
+      printf("Loading config from %s\n", config_path);
+
+      FILE *f;
+      if ((f = fopen(config_path, "r")) == NULL) {
+        fprintf(stderr, "Failed to open file.\n");
+      }
+      else {
+        char errbuf[200];
+        toml_table_t *conf = toml_parse_file(f, errbuf, sizeof(errbuf));
+        fclose(f);
+        if (conf == 0) {
+          fprintf(stderr, "Error: %s\n", errbuf);
+        }
+        else {
+          const char *raw;
+          if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
+            fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
+            fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
+          }
+          if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
+            fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
+          }
+          if ((raw=toml_raw_in(conf,"knob_command")) && toml_rtos(raw,&knob_command)) {
+            fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"long_press_command")) && toml_rtos(raw,&long_press_command)) {
+            fprintf(stderr, "Warning: bad value in 'long_press_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"clock_wise_command")) && toml_rtos(raw,&clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
+            fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
+          }
+        }
+      }
+    }
+    else {
+      printf("Config file not found, using defaults. Checked the following paths:\n");
+      if (homedir != NULL) {
+        printf("- %s/.powermate.toml\n", homedir);
+      }
+      printf("- /etc/powermate.toml\n");
+      printf("\n");
+    }
+  }
+
+  int i;
+  for (i=1; i < argc; i++) {
+    if (!strcmp(argv[i], "-d")) {
+      daemonize = 1;
+    }
+  }
+
   // Test device
   devfd = open(dev, O_RDWR);
   if (devfd == -1) {
@@ -211,24 +345,26 @@ int main(int argc, char *argv[]) {
   }
 
   // Daemonize
-  int pid = fork();
-  if (pid == 0) {
-    // We're the child process!
-    // Release handle to working directory
-    if (chdir("/") < 0) {
-      fprintf(stderr, "chdir() failed");
+  if (daemonize) {
+    int pid = fork();
+    if (pid == 0) {
+      // We're the child process!
+      // Release handle to the working directory
+      if (chdir("/") < 0) {
+        fprintf(stderr, "chdir() failed");
+      }
+      // Close things
+      fclose(stdin);
+      fclose(stdout);
+      fclose(stderr);
     }
-    // Close things
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
-  }
-  else if (pid < 0) {
-    fprintf(stderr, "Failed to become a daemon, whatevs.\n");
-  }
-  else {
-    printf("Just became a daemon, deal with it!\n");
-    return 0;
+    else if (pid < 0) {
+      fprintf(stderr, "Failed to become a daemon.\n");
+    }
+    else {
+      printf("Just became a daemon.\n");
+      return 0;
+    }
   }
 
   while (1) {
