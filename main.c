@@ -258,15 +258,49 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   return ret;
 }
 
+void print_usage(char *cmd) {
+  fprintf(stderr, "Usage: %s [-c file] [-d]\n", cmd);
+}
+
 int main(int argc, char *argv[]) {
   // Settings
   int daemonize = 0;
 
+  // Parse command-line arguments
+  char *arg_config = NULL;
+  int i;
+  for (i=1; i < argc; i++) {
+    if (!strcmp(argv[i], "-c")) {
+      if (++i == argc) {
+        // missing filename
+        print_usage(argv[0]);
+        return 1;
+      }
+      arg_config = argv[i];
+    }
+    else if (!strcmp(argv[i], "-d")) {
+      daemonize = 1;
+    }
+    else {
+      print_usage(argv[0]);
+      return 1;
+    }
+  }
+
   // Load config file
   {
-    char config_path[255] = "";
+    if (arg_config != NULL && access(arg_config, F_OK) == -1) {
+      fprintf(stderr, "Could not access file %s\n", arg_config);
+      return 1;
+    }
+    char config_path[PATH_MAX] = "";
+    if (arg_config != NULL && realpath(arg_config, config_path) == NULL) {
+      fprintf(stderr, "realpath failed\n");
+      return 1;
+    }
+
     char *homedir = getenv("HOME");
-    if (homedir != NULL) {
+    if (config_path[0] == '\0' && homedir != NULL) {
       sprintf(config_path, "%s/.powermate.toml", homedir);
       if (access(config_path, F_OK) != 0) {
         config_path[0] = '\0';
@@ -295,7 +329,8 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
             fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
+          if (daemonize == 0 && (raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
+            // can be overridden by an argument
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
           }
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
@@ -326,13 +361,6 @@ int main(int argc, char *argv[]) {
       }
       printf("- /etc/powermate.toml\n");
       printf("\n");
-    }
-  }
-
-  int i;
-  for (i=1; i < argc; i++) {
-    if (!strcmp(argv[i], "-d")) {
-      daemonize = 1;
     }
   }
 
