@@ -261,7 +261,10 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 int main(int argc, char *argv[]) {
   int i;
   for (i=1; i < argc; i++) {
-    if (!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help")) {
+    if (!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") // check if -h or --help was passed
+     || (strcmp(argv[i],"-c") && strcmp(argv[i],"-d"))     // or if it's an unexpected option
+     || (!strcmp(argv[i],"-c") && ++i == argc)             // or if it's -c but the filename is missing
+    ) {
       fprintf(stderr, "Usage: %s [-c file] [-d]\n", argv[0]);
       return 0;
     }
