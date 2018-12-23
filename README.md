@@ -55,6 +55,4 @@ You can use `./powermate -d` to daemonize the program without having to update t
 
 By default, the program changes the volume when you turn the knob clockwise and counter clockwise, but you are able to customize the program to do anything via [the configuration file](powermate.toml).
 
-On startup, it tries to read `/etc/powermate.toml` and `$HOME/.powermate.toml` as config files, but you can specify another location with the `-c` option.
-
 Press the knob to mute. Hold down the knob for one second to activate "movie mode". Operation is the same except the LED stays off.
