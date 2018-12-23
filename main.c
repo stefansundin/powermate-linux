@@ -234,7 +234,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
         }
-        else if (ev.value == 0 && knob_depressed == 1) {
+        else if (ev.value == 0 && knob_depressed) {
           // knob released
           knob_depressed = 0;
           if (knob_command == NULL) {
