@@ -276,8 +276,8 @@ int main(int argc, char *argv[]) {
   {
     char config_path[PATH_MAX] = "";
     for (i=1; i < argc; i++) {
-      if (!strcmp(argv[i], "-c") && ++i < argc) {
-        strcpy(config_path, argv[i]);
+      if (!strcmp(argv[i], "-c")) {
+        strcpy(config_path, argv[++i]);
         if (access(config_path, R_OK) != 0) {
           fprintf(stderr, "Could not access %s: %s\n", config_path, strerror(errno));
           return 1;
