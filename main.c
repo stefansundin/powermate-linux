@@ -255,16 +255,36 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
 }
 
 int main(int argc, char *argv[]) {
+  int i;
+  for (i=1; i < argc; i++) {
+    if ((strcmp(argv[i],"-c") && strcmp(argv[i],"-d"))     // check if it's an unexpected option
+     || (!strcmp(argv[i],"-c") && ++i == argc)             // check if it's -c but the filename is missing
+    ) {
+      fprintf(stderr, "Usage: %s [-c file] [-d]\n", argv[0]);
+      return 0;
+    }
+  }
+
   // Settings
   int daemonize = 0;
 
   // Load config file
   {
-    char config_path[255] = "";
+    char config_path[PATH_MAX] = "";
+    for (i=1; i < argc; i++) {
+      if (!strcmp(argv[i], "-c")) {
+        strcpy(config_path, argv[++i]);
+        if (access(config_path, R_OK) != 0) {
+          fprintf(stderr, "Could not access %s: %s\n", config_path, strerror(errno));
+          return 1;
+        }
+      }
+    }
+
     char *homedir = getenv("HOME");
-    if (homedir != NULL) {
+    if (config_path[0] == '\0' && homedir != NULL) {
       sprintf(config_path, "%s/.powermate.toml", homedir);
-      if (access(config_path, F_OK) != 0) {
+      if (access(config_path, R_OK) != 0) {
         config_path[0] = '\0';
       }
     }
@@ -272,7 +292,7 @@ int main(int argc, char *argv[]) {
       strcpy(config_path, "/etc/powermate.toml");
     }
 
-    if (access(config_path, F_OK) == 0) {
+    if (access(config_path, R_OK) == 0) {
       printf("Loading config from %s\n", config_path);
 
       FILE *f;
@@ -325,7 +345,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  int i;
   for (i=1; i < argc; i++) {
     if (!strcmp(argv[i], "-d")) {
       daemonize = 1;
