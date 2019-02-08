@@ -1,6 +1,6 @@
 # PowerMate Linux Driver
 
-This is a small Linux userspace driver for the [Griffin PowerMate](https://griffintechnology.com/us/products/audio/powermate). It requires PulseAudio to work (default in Ubuntu).
+This is a small Linux userspace driver for the [Griffin PowerMate](https://griffintechnology.com/powermate-usb) (USB version only). It requires PulseAudio to work (default in Ubuntu).
 
 For an easy to use PPA, use: https://launchpad.net/~stefansundin/+archive/ubuntu/powermate
 
