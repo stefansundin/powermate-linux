@@ -333,6 +333,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
           }
         }
+        toml_free(conf);
       }
     }
     else {
