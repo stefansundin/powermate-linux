@@ -19,7 +19,7 @@ Binaries are available [in the releases section](https://github.com/stefansundin
 ## Clone Repository
 
 ```bash
-$ git clone https://github.com/stefansundin/powermate-linux.git
+$ git clone --recursive-submodules https://github.com/stefansundin/powermate-linux.git
 $ cd powermate-linux
 ```
 
