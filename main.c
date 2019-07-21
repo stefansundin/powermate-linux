@@ -254,6 +254,23 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   return ret;
 }
 
+char *get_config_home() {
+  char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+  if (xdg_config_home != NULL && xdg_config_home[0] != '\0') {
+    return xdg_config_home;
+  }
+  char *homedir = getenv("HOME");
+  if (homedir == NULL) {
+    return NULL;
+  }
+  char config_home[PATH_MAX] = "";
+  snprintf(config_home, PATH_MAX, "%s/.config", homedir);
+  if (setenv("XDG_CONFIG_HOME", config_home, 1) != 0) {
+    return NULL;
+  }
+  return getenv("XDG_CONFIG_HOME");
+}
+
 int main(int argc, char *argv[]) {
   int i;
   for (i=1; i < argc; i++) {
@@ -281,9 +298,9 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    char *homedir = getenv("HOME");
-    if (config_path[0] == '\0' && homedir != NULL) {
-      sprintf(config_path, "%s/.powermate.toml", homedir);
+    char *config_home = get_config_home();
+    if (config_path[0] == '\0' && config_home != NULL) {
+      sprintf(config_path, "%s/powermate.toml", config_home);
       if (access(config_path, R_OK) != 0) {
         config_path[0] = '\0';
       }
@@ -338,8 +355,8 @@ int main(int argc, char *argv[]) {
     }
     else {
       printf("Config file not found, using defaults. Checked the following paths:\n");
-      if (homedir != NULL) {
-        printf("- %s/.powermate.toml\n", homedir);
+      if (config_home != NULL) {
+        printf("- %s/powermate.toml\n", config_home);
       }
       printf("- /etc/powermate.toml\n");
       printf("\n");

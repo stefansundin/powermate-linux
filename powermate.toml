@@ -1,5 +1,5 @@
 # The program checks for configuration files in the following order:
-# - $HOME/.powermate.toml
+# - $XDG_CONFIG_HOME/powermate.toml (usually ~/.config/powermate.toml)
 # - /etc/powermate.toml
 # You can override this and use a custom path by starting the program with the "-c" option.
 # If a file cannot be found, the defaults settings correspond to the values in this file.
