@@ -283,6 +283,12 @@ int main(int argc, char *argv[]) {
 
     char *homedir = getenv("HOME");
     if (config_path[0] == '\0' && homedir != NULL) {
+      sprintf(config_path, "%s/.config/powermate.toml", homedir);
+      if (access(config_path, R_OK) != 0) {
+        config_path[0] = '\0';
+      }
+    }
+    if (config_path[0] == '\0' && homedir != NULL) {
       sprintf(config_path, "%s/.powermate.toml", homedir);
       if (access(config_path, R_OK) != 0) {
         config_path[0] = '\0';

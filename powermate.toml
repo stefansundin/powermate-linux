@@ -1,4 +1,5 @@
 # The program checks for configuration files in the following order:
+# - $HOME/.config/powermate.toml
 # - $HOME/.powermate.toml
 # - /etc/powermate.toml
 # You can override this and use a custom path by starting the program with the "-c" option.
