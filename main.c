@@ -264,7 +264,7 @@ char *get_config_home() {
     return NULL;
   }
   char config_home[PATH_MAX] = "";
-  snprintf(config_home, PATH_MAX, "%s/.config", homedir);
+  snprintf(config_home, sizeof(config_home), "%s/.config", homedir);
   if (setenv("XDG_CONFIG_HOME", config_home, 1) != 0) {
     return NULL;
   }
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
 
     char *config_home = get_config_home();
     if (config_path[0] == '\0' && config_home != NULL) {
-      sprintf(config_path, "%s/powermate.toml", config_home);
+      snprintf(config_path, sizeof(config_path), "%s/powermate.toml", config_home);
       if (access(config_path, R_OK) != 0) {
         config_path[0] = '\0';
       }
