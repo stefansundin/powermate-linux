@@ -19,9 +19,8 @@ p = 2.0
 # long_press_command = "" # Default: toggle movie mode (disables the LED)
 # clock_wise_command = "" # Default: increases the volume by p%
 # counter_clock_wise_command = "" # Default: decreases the volume by p%
-
-knob_depressed_clock_wise_command = "xdotool key Up" # Default: increases the volume by p%
-knob_depressed_counter_clock_wise_command = "xdotool key Down" # Default: decreases the volume by p%
+# knob_clock_wise_command = "xdotool key Up"
+# knob_counter_clock_wise_command = "xdotool key Down"
 
 # Timeouts (in milliseconds)
 long_press_ms = 1000
