@@ -178,7 +178,10 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   if (knob_depressed && ret == 0) {
     // timer ran out
     knob_depressed = 0;
-    if (!knob_depressed_rotate) {
+    if (knob_depressed_rotate) {
+      knob_depressed_rotate = 0;
+    }
+    else {
       if (long_press_command == NULL) {
         movie_mode = !movie_mode;
         printf("Movie mode: %d\n", movie_mode);
@@ -186,9 +189,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       else {
         exec_command(long_press_command);
       }
-    }
-    else {
-      knob_depressed_rotate = 0;
     }
     update_led();
   }
@@ -256,14 +256,16 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
         }
-        else if (ev.value == 0 && knob_depressed && knob_depressed_rotate == 0) {
+        else if (ev.value == 0 && knob_depressed) {
           // knob released
           knob_depressed = 0;
-          if (knob_command == NULL) {
-            pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
-          }
-          else {
-            exec_command(knob_command);
+          if (!knob_depressed_rotate) {
+            if (knob_command == NULL) {
+              pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+            }
+            else {
+              exec_command(knob_command);
+            }
           }
         }
       }
