@@ -18,12 +18,15 @@ char *knob_command = NULL;
 char *long_press_command = NULL;
 char *clock_wise_command = NULL;
 char *counter_clock_wise_command = NULL;
+char *knob_depressed_clock_wise_command = NULL;
+char *knob_depressed_counter_clock_wise_command = NULL;
 int64_t long_press_ms = 1000;
 
 // State
 short muted = 0;
 short movie_mode = 0;
 short knob_depressed = 0;
+short knob_depressed_rotate = 0;
 int devfd = 0;
 struct timeval knob_depressed_timestamp;
 
@@ -175,12 +178,17 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   if (knob_depressed && ret == 0) {
     // timer ran out
     knob_depressed = 0;
-    if (long_press_command == NULL) {
-      movie_mode = !movie_mode;
-      printf("Movie mode: %d\n", movie_mode);
+    if (!knob_depressed_rotate) {
+      if (long_press_command == NULL) {
+        movie_mode = !movie_mode;
+        printf("Movie mode: %d\n", movie_mode);
+      }
+      else {
+        exec_command(long_press_command);
+      }
     }
     else {
-      exec_command(long_press_command);
+      knob_depressed_rotate = 0;
     }
     update_led();
   }
@@ -208,7 +216,14 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
             }
           }
           else {
-            exec_command(counter_clock_wise_command);
+            if (knob_depressed) {
+              exec_command(knob_depressed_counter_clock_wise_command);
+              knob_depressed_timestamp = ev.time;
+              knob_depressed_rotate = 1;
+            }
+            else {
+              exec_command(counter_clock_wise_command);
+            }
           }
         }
         else if (ev.value == 1) {
@@ -224,7 +239,14 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
             pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
           }
           else {
-            exec_command(clock_wise_command);
+            if (knob_depressed) {
+              exec_command(knob_depressed_clock_wise_command);
+              knob_depressed_timestamp = ev.time;
+              knob_depressed_rotate = 1;
+            }
+            else {
+              exec_command(clock_wise_command);
+            }
           }
         }
       }
@@ -234,7 +256,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
         }
-        else if (ev.value == 0 && knob_depressed) {
+        else if (ev.value == 0 && knob_depressed && knob_depressed_rotate == 0) {
           // knob released
           knob_depressed = 0;
           if (knob_command == NULL) {
@@ -345,6 +367,12 @@ int main(int argc, char *argv[]) {
           }
           if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
             fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"knob_depressed_clock_wise_command")) && toml_rtos(raw,&knob_depressed_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'knob_depressed_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"knob_depressed_counter_clock_wise_command")) && toml_rtos(raw,&knob_depressed_counter_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'knob_depressed_counter_clock_wise_command', expected a string.\n");
           }
           if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
             fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");

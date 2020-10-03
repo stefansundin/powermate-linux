@@ -20,6 +20,9 @@ p = 2.0
 # clock_wise_command = "" # Default: increases the volume by p%
 # counter_clock_wise_command = "" # Default: decreases the volume by p%
 
+knob_depressed_clock_wise_command = "xdotool key Up" # Default: increases the volume by p%
+knob_depressed_counter_clock_wise_command = "xdotool key Down" # Default: decreases the volume by p%
+
 # Timeouts (in milliseconds)
 long_press_ms = 1000
 
