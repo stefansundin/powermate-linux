@@ -14,12 +14,12 @@
 // Settings
 char *dev = "/dev/input/powermate";
 double p = 2.0;
-char *knob_command = NULL;
+char *press_command = NULL;
 char *long_press_command = NULL;
 char *clock_wise_command = NULL;
 char *counter_clock_wise_command = NULL;
-char *knob_clock_wise_command = NULL;
-char *knob_counter_clock_wise_command = NULL;
+char *press_clock_wise_command = NULL;
+char *press_counter_clock_wise_command = NULL;
 int64_t long_press_ms = 1000;
 
 // State
@@ -217,7 +217,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           }
           else {
             if (knob_depressed) {
-              exec_command(knob_counter_clock_wise_command);
+              exec_command(press_counter_clock_wise_command);
               knob_depressed_timestamp = ev.time;
               knob_depressed_rotate = 1;
             }
@@ -240,7 +240,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           }
           else {
             if (knob_depressed) {
-              exec_command(knob_clock_wise_command);
+              exec_command(press_clock_wise_command);
               knob_depressed_timestamp = ev.time;
               knob_depressed_rotate = 1;
             }
@@ -260,11 +260,11 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           // knob released
           knob_depressed = 0;
           if (!knob_depressed_rotate) {
-            if (knob_command == NULL) {
+            if (press_command == NULL) {
               pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
             }
             else {
-              exec_command(knob_command);
+              exec_command(press_command);
             }
           }
         }
@@ -358,8 +358,15 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
-          if ((raw=toml_raw_in(conf,"knob_command")) && toml_rtos(raw,&knob_command)) {
-            fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+          // Backwards-compatibility (remove later):
+          if ((raw=toml_raw_in(conf,"knob_command"))) {
+            fprintf(stderr, "Warning: knob_command is deprecated, please rename it to press_command.\n");
+            if (toml_rtos(raw,&press_command)) {
+              fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+            }
+          }
+          if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
           if ((raw=toml_raw_in(conf,"long_press_command")) && toml_rtos(raw,&long_press_command)) {
             fprintf(stderr, "Warning: bad value in 'long_press_command', expected a string.\n");
@@ -370,11 +377,11 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
             fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"knob_clock_wise_command")) && toml_rtos(raw,&knob_clock_wise_command)) {
-            fprintf(stderr, "Warning: bad value in 'knob_clock_wise_command', expected a string.\n");
+          if ((raw=toml_raw_in(conf,"press_clock_wise_command")) && toml_rtos(raw,&press_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"knob_counter_clock_wise_command")) && toml_rtos(raw,&knob_counter_clock_wise_command)) {
-            fprintf(stderr, "Warning: bad value in 'knob_counter_clock_wise_command', expected a string.\n");
+          if ((raw=toml_raw_in(conf,"press_counter_clock_wise_command")) && toml_rtos(raw,&press_counter_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_counter_clock_wise_command', expected a string.\n");
           }
           if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
             fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
