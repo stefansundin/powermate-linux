@@ -7,6 +7,10 @@
 # Path to device:
 dev = "/dev/input/powermate"
 
+# The default behavior is to control the default sink. Use "pacmd list-sinks" to list sinks.
+# Control a specific sink:
+# sink_name = "alsa_output.usb-C-Media_Electronics_Inc._USB_Audio_Device-00.analog-stereo"
+
 # Whether to daemonize the process or not:
 daemonize = false
 

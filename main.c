@@ -33,6 +33,7 @@ struct timeval knob_depressed_timestamp;
 struct pollfd *pfds = NULL;
 int pa_nfds = 0;
 int sink_index = -1;
+char *sink_name = NULL;
 pa_context *context = NULL;
 pa_cvolume vol;
 
@@ -108,12 +109,21 @@ void pa_server_info_callback(pa_context *c, const pa_server_info *info, void *us
   pa_operation_unref(pa_context_get_sink_info_by_name(context, info->default_sink_name, pa_sink_info_callback, NULL));
 }
 
+void refresh_sink_info() {
+  if (sink_name == NULL) {
+    pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
+  }
+  else {
+    pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
+  }
+}
+
 void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
   pa_subscription_event_type_t type = t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
   // printf("new event: %04x (type: %04x, index: %d)\n", t, type, index);
   if (type == PA_SUBSCRIPTION_EVENT_SERVER) {
     // sink might have changed, refresh server info
-    pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
+    refresh_sink_info();
   }
   else if (type == PA_SUBSCRIPTION_EVENT_SINK && index == sink_index) {
     // volume change
@@ -346,6 +356,9 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
             fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
           }
+          if ((raw=toml_raw_in(conf,"sink_name")) && toml_rtos(raw,&sink_name)) {
+            fprintf(stderr, "Warning: bad value in 'sink_name', expected a string.\n");
+          }
           if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
           }
@@ -392,6 +405,9 @@ int main(int argc, char *argv[]) {
       printf("- /etc/powermate.toml\n");
       printf("\n");
     }
+  }
+  if (sink_name != NULL) {
+    printf("Sink name: %s\n", sink_name);
   }
 
   for (i=1; i < argc; i++) {
@@ -459,7 +475,7 @@ int main(int argc, char *argv[]) {
     } while (state != PA_CONTEXT_READY);
 
     // We're connected, get sink data
-    pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
+    refresh_sink_info();
 
     // Subscribe to pulseaudio events
     pa_context_set_subscribe_callback(context, pa_event_callback, NULL);
