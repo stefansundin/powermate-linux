@@ -9,7 +9,7 @@
 #include "tomlc99/toml.h"
 
 // Some example code:
-// http://sowerbutts.com/powermate/
+// https://sowerbutts.com/powermate/
 
 // Settings
 char *dev = "/dev/input/powermate";
