@@ -15,10 +15,12 @@ p = 2.0
 
 # Custom commands (will disable default behavior).
 # Set to an empty string to disable the default behavior without executing a custom command.
-# knob_command = "" # Default: mute/unmute
+# press_command = "" # Default: mute/unmute
 # long_press_command = "" # Default: toggle movie mode (disables the LED)
 # clock_wise_command = "" # Default: increases the volume by p%
 # counter_clock_wise_command = "" # Default: decreases the volume by p%
+# press_clock_wise_command = ""
+# press_counter_clock_wise_command = ""
 
 # Timeouts (in milliseconds)
 long_press_ms = 1000

@@ -14,16 +14,19 @@
 // Settings
 char *dev = "/dev/input/powermate";
 double p = 2.0;
-char *knob_command = NULL;
+char *press_command = NULL;
 char *long_press_command = NULL;
 char *clock_wise_command = NULL;
 char *counter_clock_wise_command = NULL;
+char *press_clock_wise_command = NULL;
+char *press_counter_clock_wise_command = NULL;
 int64_t long_press_ms = 1000;
 
 // State
 short muted = 0;
 short movie_mode = 0;
 short knob_depressed = 0;
+short knob_depressed_rotated = 0;
 int devfd = 0;
 struct timeval knob_depressed_timestamp;
 
@@ -152,7 +155,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   pfds[nfds].revents = 0;
 
   // if the knob is depressed, then we need to timeout for the sake of detecting a long press
-  if (knob_depressed && (long_press_command == NULL || long_press_command[0] != '\0')) {
+  if (knob_depressed && !knob_depressed_rotated && (long_press_command == NULL || long_press_command[0] != '\0')) {
     struct timeval now;
     if (gettimeofday(&now, NULL) < 0) {
       fprintf(stderr, "gettimeofday failed\n");
@@ -172,7 +175,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
   //   fprintf(stderr, "%d: fd: %d. events: %d. revents: %d.\n", i, pfds[i].fd, pfds[i].events, pfds[i].revents);
   // }
 
-  if (knob_depressed && ret == 0) {
+  if (knob_depressed && !knob_depressed_rotated && ret == 0) {
     // timer ran out
     knob_depressed = 0;
     if (long_press_command == NULL) {
@@ -198,33 +201,45 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
           // counter clockwise turn
-          if (counter_clock_wise_command == NULL) {
-            if (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step) {
-              // we can lower the volume and maintain the balance if:
-              // 1. there is no inbalance (all channels have the same volume)
-              // 2. min volume on unmuted channels is greater than the step
-              pa_cvolume_dec(&vol, step);
-              pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
-            }
+          if (knob_depressed) {
+            exec_command(press_counter_clock_wise_command);
+            knob_depressed_rotated = 1;
           }
           else {
-            exec_command(counter_clock_wise_command);
+            if (counter_clock_wise_command == NULL) {
+              if (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step) {
+                // we can lower the volume and maintain the balance if:
+                // 1. there is no inbalance (all channels have the same volume)
+                // 2. min volume on unmuted channels is greater than the step
+                pa_cvolume_dec(&vol, step);
+                pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+              }
+            }
+            else {
+              exec_command(counter_clock_wise_command);
+            }
           }
         }
         else if (ev.value == 1) {
           // clockwise turn
-          if (clock_wise_command == NULL) {
-            int maxvol = PA_VOLUME_NORM;
-            if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
-              // we're already above 100%, so allow volume up to 150%
-              // see "Allow louder than 100%" in sound settings
-              maxvol *= 1.50;
-            }
-            pa_cvolume_inc_clamp(&vol, step, maxvol);
-            pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+          if (knob_depressed) {
+            exec_command(press_clock_wise_command);
+            knob_depressed_rotated = 1;
           }
           else {
-            exec_command(clock_wise_command);
+            if (clock_wise_command == NULL) {
+              int maxvol = PA_VOLUME_NORM;
+              if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+                // we're already above 100%, so allow volume up to 150%
+                // see "Allow louder than 100%" in sound settings
+                maxvol *= 1.50;
+              }
+              pa_cvolume_inc_clamp(&vol, step, maxvol);
+              pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+            }
+            else {
+              exec_command(clock_wise_command);
+            }
           }
         }
       }
@@ -237,12 +252,15 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
         else if (ev.value == 0 && knob_depressed) {
           // knob released
           knob_depressed = 0;
-          if (knob_command == NULL) {
-            pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+          if (!knob_depressed_rotated) {
+            if (press_command == NULL) {
+              pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
+            }
+            else {
+              exec_command(press_command);
+            }
           }
-          else {
-            exec_command(knob_command);
-          }
+          knob_depressed_rotated = 0;
         }
       }
     }
@@ -334,8 +352,15 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
-          if ((raw=toml_raw_in(conf,"knob_command")) && toml_rtos(raw,&knob_command)) {
-            fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+          // Backwards-compatibility (remove later):
+          if ((raw=toml_raw_in(conf,"knob_command"))) {
+            fprintf(stderr, "Warning: knob_command is deprecated, please rename it to press_command.\n");
+            if (toml_rtos(raw,&press_command)) {
+              fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
+            }
+          }
+          if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
           if ((raw=toml_raw_in(conf,"long_press_command")) && toml_rtos(raw,&long_press_command)) {
             fprintf(stderr, "Warning: bad value in 'long_press_command', expected a string.\n");
@@ -345,6 +370,12 @@ int main(int argc, char *argv[]) {
           }
           if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
             fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"press_clock_wise_command")) && toml_rtos(raw,&press_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_clock_wise_command', expected a string.\n");
+          }
+          if ((raw=toml_raw_in(conf,"press_counter_clock_wise_command")) && toml_rtos(raw,&press_counter_clock_wise_command)) {
+            fprintf(stderr, "Warning: bad value in 'press_counter_clock_wise_command', expected a string.\n");
           }
           if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
             fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
