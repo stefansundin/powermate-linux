@@ -23,6 +23,8 @@ Name=Powermate
 Description=A small Linux userspace driver for the USB Griffin PowerMate. See: https://github.com/stefansundin/powermate-linux
 Exec=powermate -d
 Icon=/opt/powermate/powermate.png" >$HOME/.local/share/applications/powermate.desktop
-
+echo
 killall powermate
 powermate
+echo
+echo "You can now delete the downloaded directory"
