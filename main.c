@@ -365,13 +365,6 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
-          // Backwards-compatibility (remove later):
-          if ((raw=toml_raw_in(conf,"knob_command"))) {
-            fprintf(stderr, "Warning: knob_command is deprecated, please rename it to press_command.\n");
-            if (toml_rtos(raw,&press_command)) {
-              fprintf(stderr, "Warning: bad value in 'knob_command', expected a string.\n");
-            }
-          }
           if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
             fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
