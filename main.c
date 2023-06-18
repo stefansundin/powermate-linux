@@ -14,6 +14,8 @@
 // Settings
 char *dev = "/dev/input/powermate";
 double p = 2.0;
+double min_volume = 0.0;
+double max_volume = 100.0;
 char *press_command = NULL;
 char *long_press_command = NULL;
 char *clock_wise_command = NULL;
@@ -217,11 +219,12 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           }
           else {
             if (counter_clock_wise_command == NULL) {
-              if (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step) {
+              if ((min_volume == 0 && (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step))
+               || pa_cvolume_min_unmuted(&vol) > min_volume) {
                 // we can lower the volume and maintain the balance if:
                 // 1. there is no inbalance (all channels have the same volume)
-                // 2. min volume on unmuted channels is greater than the step
-                pa_cvolume_dec(&vol, step);
+                // 2. min volume on unmuted channels is greater than min_volume
+                pa_cvolume_dec(&vol, MIN(step, pa_cvolume_min_unmuted(&vol)-min_volume));
                 pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
               }
             }
@@ -238,8 +241,8 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           }
           else {
             if (clock_wise_command == NULL) {
-              int maxvol = PA_VOLUME_NORM;
-              if (pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+              int maxvol = max_volume;
+              if (max_volume == 100 && pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
                 // we're already above 100%, so allow volume up to 150%
                 // see "Allow louder than 100%" in sound settings
                 maxvol *= 1.50;
@@ -365,6 +368,14 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
+          if ((raw=toml_raw_in(conf,"min_volume")) && toml_rtod(raw,&min_volume)) {
+            fprintf(stderr, "Warning: bad value in 'min_volume', expected a double.\n");
+          }
+          if ((raw=toml_raw_in(conf,"max_volume")) && toml_rtod(raw,&max_volume)) {
+            fprintf(stderr, "Warning: bad value in 'max_volume', expected a double.\n");
+          }
+          min_volume = min_volume*PA_VOLUME_NORM/100;
+          max_volume = max_volume*PA_VOLUME_NORM/100;
           if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
             fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
