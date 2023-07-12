@@ -13,7 +13,7 @@
 
 // Settings
 char *dev = "/dev/input/powermate";
-double p = 2.0;
+pa_volume_t p = 2.0*PA_VOLUME_NORM/100;
 int min_volume = 0;
 int max_volume = PA_VOLUME_NORM;
 char *press_command = NULL;
@@ -204,7 +204,6 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       devfd = -1;
     } else {
       if (ev.type == EV_REL && ev.code == 7) {
-        const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
           // counter clockwise turn
           if (knob_depressed) {
@@ -212,12 +211,12 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
             knob_depressed_rotated = 1;
           } else {
             if (counter_clock_wise_command == NULL) {
-              if ((min_volume == 0 && (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step))
+              if ((min_volume == 0 && (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > p))
                || pa_cvolume_min_unmuted(&vol) > min_volume) {
                 // we can lower the volume and maintain the balance if:
                 // 1. there is no inbalance (all channels have the same volume)
                 // 2. min volume on unmuted channels is greater than min_volume
-                pa_cvolume_dec(&vol, MIN(step, pa_cvolume_min_unmuted(&vol)-min_volume));
+                pa_cvolume_dec(&vol, MIN(p, pa_cvolume_min_unmuted(&vol)-min_volume));
                 pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
               }
             } else {
@@ -237,7 +236,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
                 // see "Allow louder than 100%" in sound settings
                 maxvol *= 1.50;
               }
-              pa_cvolume_inc_clamp(&vol, step, maxvol);
+              pa_cvolume_inc_clamp(&vol, p, maxvol);
               pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
             } else {
               exec_command(clock_wise_command);
@@ -356,7 +355,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
           }
           if ((ret=toml_double_in(conf,"p")).ok) {
-            p = ret.u.d;
+            p = ret.u.d*PA_VOLUME_NORM/100;
           } else if (toml_key_exists(conf,"p")) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
