@@ -95,12 +95,14 @@ void pa_sink_info_callback(pa_context *context, const pa_sink_info *info, int eo
   if (eol) {
     return;
   }
+  if (sink_index == info->index && !memcmp(&vol,&info->volume,sizeof(vol)) && info->mute == muted) {
+    return;
+  }
   sink_index = info->index;
-  const pa_volume_t max_vol = pa_cvolume_max(&info->volume);
-  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", info->index, max_vol, max_vol*100.0/PA_VOLUME_NORM, info->mute);
-
   memcpy(&vol, &info->volume, sizeof(vol));
   muted = info->mute;
+  const pa_volume_t max_vol = pa_cvolume_max(&vol);
+  printf("New volume (sink %d): %5d (%6.2f%%), muted: %d\n", sink_index, max_vol, max_vol*100.0/PA_VOLUME_NORM, muted);
   update_led();
 }
 
@@ -204,6 +206,8 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
       devfd = -1;
     } else {
       if (ev.type == EV_REL && ev.code == 7) {
+        pa_cvolume v;
+        memcpy(&v, &vol, sizeof(v));
         if (ev.value == -1) {
           // counter clockwise turn
           if (knob_depressed) {
@@ -211,13 +215,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
             knob_depressed_rotated = 1;
           } else {
             if (counter_clock_wise_command == NULL) {
-              if ((min_volume == 0 && (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > p))
-               || pa_cvolume_min_unmuted(&vol) > min_volume) {
+              if ((min_volume == 0 && (pa_cvolume_channels_equal(&v) || pa_cvolume_min_unmuted(&v) > p))
+               || pa_cvolume_min_unmuted(&v) > min_volume) {
                 // we can lower the volume and maintain the balance if:
                 // 1. there is no inbalance (all channels have the same volume)
                 // 2. min volume on unmuted channels is greater than min_volume
-                pa_cvolume_dec(&vol, MIN(p, pa_cvolume_min_unmuted(&vol)-min_volume));
-                pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+                pa_cvolume_dec(&v, MIN(p, pa_cvolume_min_unmuted(&v)-min_volume));
+                pa_context_set_sink_volume_by_index(context, sink_index, &v, NULL, NULL);
               }
             } else {
               exec_command(counter_clock_wise_command);
@@ -231,13 +235,13 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           } else {
             if (clock_wise_command == NULL) {
               int maxvol = max_volume;
-              if (max_volume == PA_VOLUME_NORM && pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+              if (max_volume == PA_VOLUME_NORM && pa_cvolume_max(&v) > PA_VOLUME_NORM) {
                 // we're already above 100%, so allow volume up to 150%
                 // see "Allow louder than 100%" in sound settings
                 maxvol *= 1.50;
               }
-              pa_cvolume_inc_clamp(&vol, p, maxvol);
-              pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
+              pa_cvolume_inc_clamp(&v, p, maxvol);
+              pa_context_set_sink_volume_by_index(context, sink_index, &v, NULL, NULL);
             } else {
               exec_command(clock_wise_command);
             }
