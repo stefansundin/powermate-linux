@@ -339,49 +339,70 @@ int main(int argc, char *argv[]) {
         if (conf == 0) {
           fprintf(stderr, "Error: %s\n", errbuf);
         } else {
-          const char *raw;
-          double dbl;
-          if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
+          toml_datum_t ret;
+          if ((ret=toml_string_in(conf,"dev")).ok) {
+            dev = ret.u.s;
+          } else if (toml_key_exists(conf,"dev")) {
             fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"sink_name")) && toml_rtos(raw,&sink_name)) {
+          if ((ret=toml_string_in(conf,"sink_name")).ok) {
+            sink_name = ret.u.s;
+          } else if (toml_key_exists(conf,"sink_name")) {
             fprintf(stderr, "Warning: bad value in 'sink_name', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"daemonize")) && toml_rtob(raw,&daemonize)) {
+          if ((ret=toml_bool_in(conf,"daemonize")).ok) {
+            daemonize = ret.u.b;
+          } else if (toml_key_exists(conf,"daemonize")) {
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
           }
-          if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
+          if ((ret=toml_double_in(conf,"p")).ok) {
+            p = ret.u.d;
+          } else if (toml_key_exists(conf,"p")) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
-          if ((raw=toml_raw_in(conf,"min_volume")) && toml_rtod(raw,&dbl)) {
+          if ((ret=toml_double_in(conf,"min_volume")).ok) {
+            min_volume = ret.u.d*PA_VOLUME_NORM/100;
+          } else if (toml_key_exists(conf,"min_volume")) {
             fprintf(stderr, "Warning: bad value in 'min_volume', expected a double.\n");
-          } else {
-            min_volume = dbl*PA_VOLUME_NORM/100;
           }
-          if ((raw=toml_raw_in(conf,"max_volume")) && toml_rtod(raw,&dbl)) {
+          if ((ret=toml_double_in(conf,"max_volume")).ok) {
+            max_volume = ret.u.d*PA_VOLUME_NORM/100;
+          } else if (toml_key_exists(conf,"max_volume")) {
             fprintf(stderr, "Warning: bad value in 'max_volume', expected a double.\n");
-          } else {
-            max_volume = dbl*PA_VOLUME_NORM/100;
           }
-          if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
+          if ((ret=toml_string_in(conf,"press_command")).ok) {
+            press_command = ret.u.s;
+          } else if (toml_key_exists(conf,"press_command")) {
             fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"long_press_command")) && toml_rtos(raw,&long_press_command)) {
+          if ((ret=toml_string_in(conf,"long_press_command")).ok) {
+            long_press_command = ret.u.s;
+          } else if (toml_key_exists(conf,"long_press_command")) {
             fprintf(stderr, "Warning: bad value in 'long_press_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"clock_wise_command")) && toml_rtos(raw,&clock_wise_command)) {
+          if ((ret=toml_string_in(conf,"clock_wise_command")).ok) {
+            clock_wise_command = ret.u.s;
+          } else if (toml_key_exists(conf,"clock_wise_command")) {
             fprintf(stderr, "Warning: bad value in 'clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"counter_clock_wise_command")) && toml_rtos(raw,&counter_clock_wise_command)) {
+          if ((ret=toml_string_in(conf,"counter_clock_wise_command")).ok) {
+            counter_clock_wise_command = ret.u.s;
+          } else if (toml_key_exists(conf,"counter_clock_wise_command")) {
             fprintf(stderr, "Warning: bad value in 'counter_clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"press_clock_wise_command")) && toml_rtos(raw,&press_clock_wise_command)) {
+          if ((ret=toml_string_in(conf,"press_clock_wise_command")).ok) {
+            press_clock_wise_command = ret.u.s;
+          } else if (toml_key_exists(conf,"press_clock_wise_command")) {
             fprintf(stderr, "Warning: bad value in 'press_clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"press_counter_clock_wise_command")) && toml_rtos(raw,&press_counter_clock_wise_command)) {
+          if ((ret=toml_string_in(conf,"press_counter_clock_wise_command")).ok) {
+            press_counter_clock_wise_command = ret.u.s;
+          } else if (toml_key_exists(conf,"press_counter_clock_wise_command")) {
             fprintf(stderr, "Warning: bad value in 'press_counter_clock_wise_command', expected a string.\n");
           }
-          if ((raw=toml_raw_in(conf,"long_press_ms")) && toml_rtoi(raw,&long_press_ms)) {
+          if ((ret=toml_int_in(conf,"long_press_ms")).ok) {
+            long_press_ms = ret.u.i;
+          } else if (toml_key_exists(conf,"long_press_ms")) {
             fprintf(stderr, "Warning: bad value in 'long_press_ms', expected an integer.\n");
           }
         }
