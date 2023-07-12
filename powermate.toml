@@ -38,6 +38,14 @@ max_volume = 100.0
 long_press_ms = 1000
 
 # Handy commands:
+# playerctl play-pause
+# playerctl previous
+# playerctl next
+# playerctl position 10-
+# playerctl position 10+
+# playerctl volume 2-
+# playerctl volume 2+
+# playerctl open https://theuselessweb.site/nooooooooooooooo/nooo.ogg
 # xdotool key XF86AudioPlay
 # xdotool key XF86AudioPrev
 # xdotool key XF86AudioNext
