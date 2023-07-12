@@ -14,8 +14,8 @@
 // Settings
 char *dev = "/dev/input/powermate";
 double p = 2.0;
-double min_volume = 0.0;
-double max_volume = 100.0;
+int min_volume = 0;
+int max_volume = PA_VOLUME_NORM;
 char *press_command = NULL;
 char *long_press_command = NULL;
 char *clock_wise_command = NULL;
@@ -242,7 +242,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           else {
             if (clock_wise_command == NULL) {
               int maxvol = max_volume;
-              if (max_volume == 100 && pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
+              if (max_volume == PA_VOLUME_NORM && pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
                 // we're already above 100%, so allow volume up to 150%
                 // see "Allow louder than 100%" in sound settings
                 maxvol *= 1.50;
@@ -356,6 +356,7 @@ int main(int argc, char *argv[]) {
         }
         else {
           const char *raw;
+          double dbl;
           if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
             fprintf(stderr, "Warning: bad value in 'dev', expected a string.\n");
           }
@@ -368,14 +369,16 @@ int main(int argc, char *argv[]) {
           if ((raw=toml_raw_in(conf,"p")) && toml_rtod(raw,&p)) {
             fprintf(stderr, "Warning: bad value in 'p', expected a double.\n");
           }
-          if ((raw=toml_raw_in(conf,"min_volume")) && toml_rtod(raw,&min_volume)) {
+          if ((raw=toml_raw_in(conf,"min_volume")) && toml_rtod(raw,&dbl)) {
             fprintf(stderr, "Warning: bad value in 'min_volume', expected a double.\n");
+          } else {
+            min_volume = dbl*PA_VOLUME_NORM/100;
           }
-          if ((raw=toml_raw_in(conf,"max_volume")) && toml_rtod(raw,&max_volume)) {
+          if ((raw=toml_raw_in(conf,"max_volume")) && toml_rtod(raw,&dbl)) {
             fprintf(stderr, "Warning: bad value in 'max_volume', expected a double.\n");
+          } else {
+            max_volume = dbl*PA_VOLUME_NORM/100;
           }
-          min_volume = min_volume*PA_VOLUME_NORM/100;
-          max_volume = max_volume*PA_VOLUME_NORM/100;
           if ((raw=toml_raw_in(conf,"press_command")) && toml_rtos(raw,&press_command)) {
             fprintf(stderr, "Warning: bad value in 'press_command', expected a string.\n");
           }
