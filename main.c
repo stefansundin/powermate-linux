@@ -65,8 +65,7 @@ void set_led(unsigned int val) {
 void update_led() {
   if (muted || movie_mode) {
     set_led(0);
-  }
-  else {
+  } else {
     const pa_volume_t max_vol = pa_cvolume_max(&vol);
     unsigned int val = MIN(max_vol, PA_VOLUME_NORM);
     set_led(val * 255 / PA_VOLUME_NORM);
@@ -114,8 +113,7 @@ void pa_server_info_callback(pa_context *c, const pa_server_info *info, void *us
 void refresh_sink_info() {
   if (sink_name == NULL) {
     pa_operation_unref(pa_context_get_server_info(context, pa_server_info_callback, NULL));
-  }
-  else {
+  } else {
     pa_operation_unref(pa_context_get_sink_info_by_name(context, sink_name, pa_sink_info_callback, NULL));
   }
 }
@@ -126,8 +124,7 @@ void pa_event_callback(pa_context *context, pa_subscription_event_type_t t, uint
   if (type == PA_SUBSCRIPTION_EVENT_SERVER) {
     // sink might have changed, refresh server info
     refresh_sink_info();
-  }
-  else if (type == PA_SUBSCRIPTION_EVENT_SINK && index == sink_index) {
+  } else if (type == PA_SUBSCRIPTION_EVENT_SINK && index == sink_index) {
     // volume change
     pa_operation_unref(pa_context_get_sink_info_by_index(context, sink_index, pa_sink_info_callback, NULL));
   }
@@ -152,8 +149,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     if (devfd == -1) {
       fprintf(stderr, "Error: %s\n", strerror(errno));
       sleep(1);
-    }
-    else {
+    } else {
       printf("Device connected!\n");
       // When the device is connected, the kernel driver sets the LED to 50% brightness
       // We have to update the LED to represent the current volume
@@ -193,8 +189,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     if (long_press_command == NULL) {
       movie_mode = !movie_mode;
       printf("Movie mode: %d\n", movie_mode);
-    }
-    else {
+    } else {
       exec_command(long_press_command);
     }
     update_led();
@@ -207,8 +202,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     if (n != sizeof(ev)) {
       printf("Device disappeared!\n");
       devfd = -1;
-    }
-    else {
+    } else {
       if (ev.type == EV_REL && ev.code == 7) {
         const pa_volume_t step = PA_VOLUME_NORM*p/100;
         if (ev.value == -1) {
@@ -216,8 +210,7 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
           if (knob_depressed) {
             exec_command(press_counter_clock_wise_command);
             knob_depressed_rotated = 1;
-          }
-          else {
+          } else {
             if (counter_clock_wise_command == NULL) {
               if ((min_volume == 0 && (pa_cvolume_channels_equal(&vol) || pa_cvolume_min_unmuted(&vol) > step))
                || pa_cvolume_min_unmuted(&vol) > min_volume) {
@@ -227,19 +220,16 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
                 pa_cvolume_dec(&vol, MIN(step, pa_cvolume_min_unmuted(&vol)-min_volume));
                 pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
               }
-            }
-            else {
+            } else {
               exec_command(counter_clock_wise_command);
             }
           }
-        }
-        else if (ev.value == 1) {
+        } else if (ev.value == 1) {
           // clockwise turn
           if (knob_depressed) {
             exec_command(press_clock_wise_command);
             knob_depressed_rotated = 1;
-          }
-          else {
+          } else {
             if (clock_wise_command == NULL) {
               int maxvol = max_volume;
               if (max_volume == PA_VOLUME_NORM && pa_cvolume_max(&vol) > PA_VOLUME_NORM) {
@@ -249,27 +239,23 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
               }
               pa_cvolume_inc_clamp(&vol, step, maxvol);
               pa_context_set_sink_volume_by_index(context, sink_index, &vol, NULL, NULL);
-            }
-            else {
+            } else {
               exec_command(clock_wise_command);
             }
           }
         }
-      }
-      else if (ev.type == EV_KEY && ev.code == 256) {
+      } else if (ev.type == EV_KEY && ev.code == 256) {
         if (ev.value == 1) {
           // knob depressed
           knob_depressed = 1;
           knob_depressed_timestamp = ev.time;
-        }
-        else if (ev.value == 0 && knob_depressed) {
+        } else if (ev.value == 0 && knob_depressed) {
           // knob released
           knob_depressed = 0;
           if (!knob_depressed_rotated) {
             if (press_command == NULL) {
               pa_context_set_sink_mute_by_index(context, sink_index, !muted, NULL, NULL);
-            }
-            else {
+            } else {
               exec_command(press_command);
             }
           }
@@ -346,15 +332,13 @@ int main(int argc, char *argv[]) {
       FILE *f;
       if ((f = fopen(config_path, "r")) == NULL) {
         fprintf(stderr, "Failed to open file.\n");
-      }
-      else {
+      } else {
         char errbuf[200];
         toml_table_t *conf = toml_parse_file(f, errbuf, sizeof(errbuf));
         fclose(f);
         if (conf == 0) {
           fprintf(stderr, "Error: %s\n", errbuf);
-        }
-        else {
+        } else {
           const char *raw;
           double dbl;
           if ((raw=toml_raw_in(conf,"dev")) && toml_rtos(raw,&dev)) {
@@ -403,8 +387,7 @@ int main(int argc, char *argv[]) {
         }
         toml_free(conf);
       }
-    }
-    else {
+    } else {
       printf("Config file not found, using defaults. Checked the following paths:\n");
       if (config_home != NULL) {
         printf("- %s/powermate.toml\n", config_home);
@@ -444,11 +427,9 @@ int main(int argc, char *argv[]) {
       fclose(stdin);
       fclose(stdout);
       fclose(stderr);
-    }
-    else if (pid < 0) {
+    } else if (pid < 0) {
       fprintf(stderr, "Failed to become a daemon.\n");
-    }
-    else {
+    } else {
       printf("Just became a daemon.\n");
       return 0;
     }
