@@ -13,6 +13,8 @@
 
 // Settings
 char *dev = "/dev/input/powermate";
+char *sink_name = NULL;
+short led_enabled = 1;
 pa_volume_t p = 2.0*PA_VOLUME_NORM/100;
 int min_volume = 0;
 int max_volume = PA_VOLUME_NORM;
@@ -26,7 +28,6 @@ int64_t long_press_ms = 1000;
 
 // State
 short muted = 0;
-short movie_mode = 0;
 short knob_depressed = 0;
 short knob_depressed_rotated = 0;
 int devfd = 0;
@@ -35,7 +36,6 @@ struct timeval knob_depressed_timestamp;
 struct pollfd *pfds = NULL;
 int pa_nfds = 0;
 int sink_index = -1;
-char *sink_name = NULL;
 pa_context *context = NULL;
 pa_cvolume vol;
 
@@ -63,7 +63,7 @@ void set_led(unsigned int val) {
 }
 
 void update_led() {
-  if (muted || movie_mode) {
+  if (muted || !led_enabled) {
     set_led(0);
   } else {
     const pa_volume_t max_vol = pa_cvolume_max(&vol);
@@ -187,8 +187,8 @@ int poll_func(struct pollfd *ufds, unsigned long nfds, int timeout, void *userda
     // timer ran out
     knob_depressed = 0;
     if (long_press_command == NULL) {
-      movie_mode = !movie_mode;
-      printf("Movie mode: %d\n", movie_mode);
+      led_enabled = !led_enabled;
+      printf("LED enabled: %d\n", led_enabled);
     } else {
       exec_command(long_press_command);
     }
@@ -353,6 +353,11 @@ int main(int argc, char *argv[]) {
             daemonize = ret.u.b;
           } else if (toml_key_exists(conf,"daemonize")) {
             fprintf(stderr, "Warning: bad value in 'daemonize', expected a boolean.\n");
+          }
+          if ((ret=toml_bool_in(conf,"led_enabled")).ok) {
+            led_enabled = ret.u.b;
+          } else if (toml_key_exists(conf,"led_enabled")) {
+            fprintf(stderr, "Warning: bad value in 'led_enabled', expected a boolean.\n");
           }
           if ((ret=toml_double_in(conf,"p")).ok) {
             p = ret.u.d*PA_VOLUME_NORM/100;
