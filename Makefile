@@ -1,17 +1,27 @@
 # sudo apt install build-essential libpulse-dev
 
-CFLAGS = -O2 -s -Wall -Wl,--as-needed $(shell pkg-config --cflags libpulse)
-LIBS = $(shell pkg-config --libs libpulse)
+CC          ?= gcc
+PKG_CONFIG  ?= pkg-config
+CFLAGS      += -O2 -s -Wall $(shell $(PKG_CONFIG) --cflags libpulse)
+LDFLAGS     += -Wl,--as-needed
+LDLIBS      += $(shell $(PKG_CONFIG) --libs libpulse)
+PREFIX      ?= /usr/local
+BINDIR       = $(PREFIX)/bin
+UDEVDIR      = /lib/udev/rules.d
+INSTALL     ?= install
 
 powermate: main.c
-	gcc -o powermate main.c tomlc99/toml.c $(CFLAGS) $(LIBS)
+	$(CC) -o powermate main.c tomlc99/toml.c $(CFLAGS) $(LDLIBS)
 
 # sudo dpkg --add-architecture i386
 # sudo apt install gcc-multilib libpulse-dev:i386 libglib2.0-dev:i386
 powermate32: main.c
-	gcc -o powermate32 main.c tomlc99/toml.c $(CFLAGS) $(LIBS) -m32
+	$(CC) -o powermate32 main.c tomlc99/toml.c $(CFLAGS) $(LDLIBS) -m32
 
 all: powermate powermate32
+
+release: LDFLAGS += -s
+release: all
 
 run: powermate
 	./powermate -c powermate.toml
@@ -20,4 +30,8 @@ clean:
 	-killall -q powermate powermate32
 	rm -f powermate powermate32
 
-.PHONY: all run clean
+install: powermate
+	$(INSTALL) -D -m 755 powermate $(DESTDIR)$(BINDIR)/powermate
+	$(INSTALL) -D -m 644 60-powermate.rules $(DESTDIR)$(UDEVDIR)/60-powermate.rules
+
+.PHONY: all release run clean install
