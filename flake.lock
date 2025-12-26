@@ -1,0 +1,46 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1766651565,
+        "narHash": "sha256-QEhk0eXgyIqTpJ/ehZKg9IKS7EtlWxF3N7DXy42zPfU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3e2499d5539c16d0d173ba53552a4ff8547f4539",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "powermate": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1766719122,
+        "narHash": "sha256-P+ii3kOEdx8rQemSOSu+vL5TE7DhZRVNRe2Q07K4530=",
+        "ref": "refs/heads/master",
+        "rev": "4bad63bce3236a792bba8e891d22aad0df0bfc25",
+        "revCount": 59,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/stefansundin/powermate-linux.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/stefansundin/powermate-linux.git"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "powermate": "powermate"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
